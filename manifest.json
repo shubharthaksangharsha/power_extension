@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Clipboard Assistant",
+  "version": "1.0",
+  "description": "Process clipboard content with Gemini AI and paste responses",
+  "permissions": [
+    "clipboardRead",
+    "clipboardWrite",
+    "storage",
+    "notifications",
+    "tabs"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "commands": {
+    "process-clipboard": {
+      "suggested_key": {
+        "default": "Ctrl+I",
+        "mac": "Command+I"
+      },
+      "description": "Process clipboard content with Gemini"
+    },
+    "paste-response": {
+      "suggested_key": {
+        "default": "Ctrl+[",
+        "mac": "Command+["
+      },
+      "description": "Paste Gemini response"
+    }
+  },
+  "icons": {
+    "48": "myicon.png",
+    "128": "myicon.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "myicon.png",
+      "128": "myicon.png"
+    }
+  }
+} 
