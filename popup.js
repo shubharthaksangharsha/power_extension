@@ -25,10 +25,6 @@ document.addEventListener('DOMContentLoaded', function() {
       chrome.runtime.sendMessage({
         action: "apiKeySaved",
         apiKey: apiKey
-      }, function(response) {
-        if (chrome.runtime.lastError) {
-          console.error('Error communicating with background script:', chrome.runtime.lastError);
-        }
       });
     });
   });

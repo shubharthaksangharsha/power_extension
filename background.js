@@ -16,25 +16,25 @@ async function getClipboardAndSendToGemini() {
     // Get active tab to request clipboard content from it
     const tabs = await chrome.tabs.query({active: true, currentWindow: true});
     if (!tabs || tabs.length === 0) {
-      showNotification("Error", "No active tab found");
+      showToast("Error", "No active tab found", "error");
       return;
     }
     
     // Send message to content script to get clipboard content
     chrome.tabs.sendMessage(tabs[0].id, {action: "getClipboardContent"}, async (response) => {
       if (chrome.runtime.lastError) {
-        showNotification("Error", "Failed to communicate with page: " + chrome.runtime.lastError.message);
+        showToast("Error", "Failed to communicate with page: " + chrome.runtime.lastError.message, "error");
         return;
       }
       
       if (!response || !response.success) {
-        showNotification("Error", "Failed to read clipboard: " + (response?.error || "Unknown error"));
+        showToast("Error", "Failed to read clipboard: " + (response?.error || "Unknown error"), "error");
         return;
       }
       
       const clipboardContent = response.content;
       if (!clipboardContent) {
-        showNotification("Empty Clipboard", "Nothing to send to Gemini.");
+        showToast("Empty Clipboard", "Nothing to send to Gemini", "error");
         return;
       }
       
@@ -43,7 +43,7 @@ async function getClipboardAndSendToGemini() {
     });
   } catch (error) {
     console.error("Error getting clipboard:", error);
-    showNotification("Error", "Failed to get clipboard content: " + error.message);
+    showToast("Error", "Failed to get clipboard content: " + error.message, "error");
   }
 }
 
@@ -55,12 +55,12 @@ async function processContentWithGemini(content) {
     const apiKey = result.geminiApiKey;
     
     if (!apiKey) {
-      showNotification("API Key Missing", "Please set your Gemini API key in the extension popup.");
+      showToast("API Key Missing", "Please set your Gemini API key in the extension popup", "error");
       return;
     }
     
-    // Show notification that request is being processed
-    showNotification("Processing", "Sending your request to Gemini...");
+    // Show toast that request is being processed
+    showToast("Processing", "Sending your request to Gemini...", "processing");
     
     // Prepare the request to Gemini API
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
@@ -88,7 +88,7 @@ async function processContentWithGemini(content) {
     const data = await response.json();
     
     if (data.error) {
-      showNotification("Error", data.error.message || "Failed to get response from Gemini");
+      showToast("Error", data.error.message || "Failed to get response from Gemini", "error");
       return;
     }
     
@@ -102,14 +102,14 @@ async function processContentWithGemini(content) {
       // Store the response in extension storage for persistence
       await chrome.storage.local.set({latestGeminiResponse: geminiResponse});
       
-      showNotification("Success", "Response from Gemini is ready! Press Ctrl+M to paste it.");
+      showToast("Success", "Response from Gemini is ready! Press Ctrl+M to paste it", "success");
     } else {
-      showNotification("Error", "Received an empty response from Gemini.");
+      showToast("Error", "Received an empty response from Gemini", "error");
     }
     
   } catch (error) {
     console.error("Error processing request:", error);
-    showNotification("Error", "Failed to process your request: " + error.message);
+    showToast("Error", "Failed to process your request: " + error.message, "error");
   }
 }
 
@@ -126,7 +126,7 @@ async function pasteGeminiResponse() {
     }
     
     if (!response) {
-      showNotification("No Response", "No Gemini response available to paste.");
+      showToast("No Response", "No Gemini response available to paste", "error");
       return;
     }
     
@@ -135,23 +135,28 @@ async function pasteGeminiResponse() {
       if (tabs[0]) {
         chrome.tabs.sendMessage(tabs[0].id, {action: "pasteResponse", response: response});
       } else {
-        showNotification("Error", "Cannot paste response in the current context.");
+        showToast("Error", "Cannot paste response in the current context", "error");
       }
     });
     
   } catch (error) {
     console.error("Error pasting response:", error);
-    showNotification("Error", "Failed to paste response: " + error.message);
+    showToast("Error", "Failed to paste response: " + error.message, "error");
   }
 }
 
-// Function to show notification
-function showNotification(title, message) {
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'myicon.png',
-    title: title,
-    message: message
+// Function to show toast via content script
+function showToast(title, message, type = 'info', duration = 5000) {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: "showToast",
+        title: title,
+        message: message,
+        type: type,
+        duration: duration
+      });
+    }
   });
 }
 
@@ -176,13 +181,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "apiKeySaved") {
     console.log("API key was saved successfully");
-    showNotification("API Key Saved", "Your Gemini API key has been saved successfully!");
-    sendResponse({success: true});
-    return true;
-  }
-  
-  if (message.action === "showNotification") {
-    showNotification(message.title, message.message);
+    showToast("API Key Saved", "Your Gemini API key has been saved successfully!", "success");
     sendResponse({success: true});
     return true;
   }

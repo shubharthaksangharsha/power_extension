@@ -1,9 +1,83 @@
+// Initialize toast notification system
+function initializeToastSystem() {
+  // Check if the toast system is already injected
+  if (window.geminiToastNotifier) return;
+  
+  // Create script element to inject toast.js
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('toast.js');
+  script.onload = function() {
+    this.remove(); // Remove the script element after it's loaded
+  };
+  document.head.appendChild(script);
+}
+
+// Show toast notification 
+function showToast(title, message, type = 'info', duration = 5000) {
+  // Inject the toast script if needed
+  if (!window.geminiToastNotifier) {
+    initializeToastSystem();
+    
+    // Wait a bit for the toast system to initialize
+    setTimeout(() => {
+      executeToast(title, message, type, duration);
+    }, 100);
+  } else {
+    executeToast(title, message, type, duration);
+  }
+}
+
+// Execute the toast display
+function executeToast(title, message, type, duration) {
+  // Use a content script bridge to call the in-page function
+  const code = `
+    if (window.geminiToastNotifier) {
+      window.geminiToastNotifier.showToast(
+        ${JSON.stringify(title)}, 
+        ${JSON.stringify(message)}, 
+        ${JSON.stringify(type)}, 
+        ${duration}
+      );
+    }
+  `;
+  
+  try {
+    // Execute the code in the page context
+    const script = document.createElement('script');
+    script.textContent = code;
+    document.documentElement.appendChild(script);
+    script.remove();
+  } catch (error) {
+    console.error('Failed to show toast:', error);
+  }
+}
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Initialize toast system on page load
+  if (document.readyState === 'complete') {
+    initializeToastSystem();
+  } else {
+    window.addEventListener('load', initializeToastSystem);
+  }
+  
+  // Handle notification request
+  if (message.action === "showToast") {
+    showToast(
+      message.title, 
+      message.message, 
+      message.type || 'info', 
+      message.duration || 5000
+    );
+    sendResponse({success: true});
+    return true;
+  }
+  
   // Handle request to get clipboard content
   if (message.action === "getClipboardContent") {
     navigator.clipboard.readText()
       .then(text => {
+        showToast("Clipboard Read", "Sending content to Gemini...", "processing");
         sendResponse({success: true, content: text});
       })
       .catch(error => {
