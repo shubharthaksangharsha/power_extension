@@ -9,65 +9,98 @@ function initializeToastSystem() {
   }
 }
 
-// Add this function near the top of content.js
-function createFallbackIndicator() {
+// Show minimalist toast notification
+function showToast(status, type = 'info', duration = 3000) {
+  // Use a fallback for Jupyter notebooks
+  if (window.location.href.includes('jupyter') || document.querySelector('.jp-Notebook')) {
+    return showFallbackToast(status, type, duration);
+  }
+  
+  // Create a custom element to communicate with the page
+  const toastEvent = document.createElement('div');
+  toastEvent.id = 'gemini-toast-trigger-' + Date.now();
+  toastEvent.setAttribute('data-status', status);
+  toastEvent.setAttribute('data-type', type);
+  toastEvent.setAttribute('data-duration', duration);
+  toastEvent.style.display = 'none';
+  
+  // Add to page and dispatch event
+  document.body.appendChild(toastEvent);
+  
+  // Create and dispatch a custom event
+  const customEvent = new CustomEvent('gemini-toast-show', {
+    detail: {
+      status: status,
+      type: type,
+      duration: duration
+    }
+  });
+  document.dispatchEvent(customEvent);
+  
+  // Cleanup
+  setTimeout(() => {
+    if (toastEvent.parentNode) {
+      toastEvent.parentNode.removeChild(toastEvent);
+    }
+  }, 100);
+}
+
+// Fallback for restricted environments
+function showFallbackToast(status, type = 'info', duration = 3000) {
   // Create a floating indicator that doesn't require scripts
   const indicator = document.createElement('div');
+  
+  // Set color based on type
+  let bgColor = '#4285f4'; // info (blue)
+  switch (type) {
+    case 'success':
+      bgColor = '#34a853'; // green
+      break;
+    case 'error':
+      bgColor = '#ea4335'; // red
+      break;
+    case 'processing':
+      bgColor = '#fbbc05'; // yellow
+      break;
+  }
   
   // Apply styles directly
   Object.assign(indicator.style, {
     position: 'fixed',
     bottom: '20px',
     right: '20px',
-    backgroundColor: '#333',
+    backgroundColor: bgColor,
     color: 'white',
-    padding: '12px 16px',
-    borderRadius: '8px',
+    padding: '10px 16px',
+    borderRadius: '20px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
     zIndex: '2147483647',
     fontFamily: 'Arial, sans-serif',
     fontSize: '14px',
-    maxWidth: '300px',
-    animation: 'fadeIn 0.3s ease forwards'
+    fontWeight: 'bold',
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase',
+    opacity: '0',
+    transform: 'translateY(20px)',
+    transition: 'opacity 0.3s ease, transform 0.3s ease'
   });
+  
+  // Set content
+  indicator.textContent = status;
   
   // Add indicator to the page
   document.body.appendChild(indicator);
   
-  return indicator;
-}
-
-// Add this function above showToast in content.js
-function showFallbackToast(title, message, type = 'info', duration = 5000) {
-  const indicator = createFallbackIndicator();
-  
-  // Set color based on type
-  let color = '#4285f4'; // info (blue)
-  switch (type) {
-    case 'success':
-      color = '#34a853'; // green
-      break;
-    case 'error':
-      color = '#ea4335'; // red
-      break;
-    case 'processing':
-      color = '#fbbc05'; // yellow
-      break;
-  }
-  
-  indicator.style.borderLeft = `4px solid ${color}`;
-  
-  // Set content
-  indicator.innerHTML = `
-    <div style="font-weight: bold; margin-bottom: 4px;">${title}</div>
-    <div>${message}</div>
-  `;
+  // Trigger animation
+  setTimeout(() => {
+    indicator.style.opacity = '1';
+    indicator.style.transform = 'translateY(0)';
+  }, 10);
   
   // Remove after duration
   setTimeout(() => {
     indicator.style.opacity = '0';
     indicator.style.transform = 'translateY(20px)';
-    indicator.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
     
     setTimeout(() => {
       if (indicator.parentNode) {
@@ -79,96 +112,38 @@ function showFallbackToast(title, message, type = 'info', duration = 5000) {
   return indicator;
 }
 
-// Update showToast function to use the fallback on CSP-restricted pages
-function showToast(title, message, type = 'info', duration = 5000) {
-  // Try to detect if we're in a restricted environment like Jupyter
-  const inJupyter = window.location.href.includes('jupyter') || 
-                   document.querySelector('.jp-Notebook') !== null;
-  
-  // Use fallback for Jupyter or if notification fails
-  if (inJupyter) {
-    return showFallbackToast(title, message, type, duration);
-  }
-  
-  // Original toast implementation with a fallback
-  try {
-    // Create a custom element to communicate with the page
-    const toastEvent = document.createElement('div');
-    toastEvent.id = 'gemini-toast-trigger-' + Date.now();
-    toastEvent.setAttribute('data-title', title);
-    toastEvent.setAttribute('data-message', message);
-    toastEvent.setAttribute('data-type', type);
-    toastEvent.setAttribute('data-duration', duration);
-    toastEvent.style.display = 'none';
-    
-    // Add custom event listener
-    document.addEventListener('gemini-toast-trigger-ready', function handleToastTrigger(e) {
-      if (e.target.id === toastEvent.id) {
-        // Extract the data and show toast
-        const toastData = {
-          title: e.target.getAttribute('data-title'),
-          message: e.target.getAttribute('data-message'),
-          type: e.target.getAttribute('data-type'),
-          duration: parseInt(e.target.getAttribute('data-duration'), 10)
-        };
-        
-        // Add a script that will be executed in the page context
-        const script = document.createElement('script');
-        script.textContent = `
-          if (window.geminiToastNotifier) {
-            window.geminiToastNotifier.showToast(
-              "${toastData.title.replace(/"/g, '\\"')}", 
-              "${toastData.message.replace(/"/g, '\\"')}", 
-              "${toastData.type}", 
-              ${toastData.duration}
-            );
-          }
-        `;
-        
-        // Create a new event to communicate without inline scripts
-        const toastComm = new CustomEvent('gemini-toast-show', {
-          detail: toastData
-        });
-        document.dispatchEvent(toastComm);
-        
-        // Cleanup
-        document.removeEventListener('gemini-toast-trigger-ready', handleToastTrigger);
-        if (e.target.parentNode) {
-          e.target.parentNode.removeChild(e.target);
-        }
+// Add listener to document for toast communication
+document.addEventListener('DOMContentLoaded', function() {
+  const script = document.createElement('script');
+  script.textContent = `
+    document.addEventListener('gemini-toast-show', function(e) {
+      if (window.geminiToastNotifier && e.detail) {
+        window.geminiToastNotifier.showToast(
+          e.detail.status, 
+          e.detail.type, 
+          e.detail.duration
+        );
       }
     });
-    
-    // Append to document to trigger the event
-    document.body.appendChild(toastEvent);
-    
-    // Dispatch the ready event
-    const readyEvent = new CustomEvent('gemini-toast-trigger-ready', {
-      bubbles: true
-    });
-    toastEvent.dispatchEvent(readyEvent);
-  } catch (error) {
-    console.error('Toast error, using fallback:', error);
-    return showFallbackToast(title, message, type, duration);
-  }
-}
+  `;
+  document.head.appendChild(script);
+  script.remove();
+  
+  // Initialize toast system
+  initializeToastSystem();
+});
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Initialize toast system on page load
-  if (document.readyState === 'complete') {
-    initializeToastSystem();
-  } else {
-    window.addEventListener('load', initializeToastSystem);
-  }
+  // Initialize toast system if it hasn't been already
+  initializeToastSystem();
   
   // Handle notification request
   if (message.action === "showToast") {
     showToast(
-      message.title, 
-      message.message, 
+      message.status,
       message.type || 'info', 
-      message.duration || 5000
+      message.duration || 3000
     );
     sendResponse({success: true});
     return true;
@@ -178,7 +153,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "getClipboardContent") {
     navigator.clipboard.readText()
       .then(text => {
-        showToast("Clipboard Read", "Sending content to Gemini...", "processing");
+        showToast("SENDING", "processing");
         sendResponse({success: true, content: text});
       })
       .catch(error => {
@@ -201,8 +176,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         document.body.removeChild(textArea);
         
         if (clipboardText) {
+          showToast("SENDING", "processing");
           sendResponse({success: true, content: clipboardText});
         } else {
+          showToast("ERROR", "error");
           sendResponse({success: false, error: "Could not read clipboard content"});
         }
       });
@@ -240,11 +217,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Move the cursor to the end of the inserted text
         activeElement.selectionStart = startPos + message.response.length;
         activeElement.selectionEnd = startPos + message.response.length;
+        
+        showToast("PASTED", "success");
       } 
       // Handle contentEditable elements
       else if (activeElement.isContentEditable) {
         // Execute command to paste text
         document.execCommand('insertText', false, message.response);
+        showToast("PASTED", "success");
       }
       
       sendResponse({success: true});
@@ -252,15 +232,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // If we're not in an editable field, try to use clipboard API
       navigator.clipboard.writeText(message.response)
         .then(() => {
-          chrome.runtime.sendMessage({
-            action: "showNotification", 
-            title: "Copied to Clipboard",
-            message: "The response has been copied to your clipboard."
-          });
+          showToast("COPIED", "success");
           sendResponse({success: true});
         })
         .catch(err => {
           console.error("Could not copy text: ", err);
+          showToast("ERROR", "error");
           sendResponse({success: false, error: err.message});
         });
     }

@@ -16,10 +16,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     chrome.storage.local.set({geminiApiKey: apiKey}, function() {
-      showStatus('API key saved successfully!', 'success');
-      
-      // Additional console log for debugging
-      console.log('API key saved:', apiKey);
+      showStatus('API key saved!', 'success');
+      console.log('API key saved');
       
       // Send a message to background script to confirm the API key is saved
       chrome.runtime.sendMessage({
@@ -33,14 +31,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusElement = document.getElementById('status');
     statusElement.textContent = message;
     statusElement.className = 'status ' + type;
-    
-    // Make sure the status is visible
     statusElement.style.display = 'block';
     
-    // Keep the status visible for longer (5 seconds)
     setTimeout(() => {
       statusElement.className = 'status';
       statusElement.style.display = 'none';
-    }, 5000);
+    }, 3000);
   }
 }); 
