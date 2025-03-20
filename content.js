@@ -1,51 +1,95 @@
 // Listen for messages from the background script
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request.action === "paste") {
-    // Old method - simulating paste event (not working well)
-    const pasteEvent = new ClipboardEvent('paste', {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: new DataTransfer()
-    });
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Handle request to get clipboard content
+  if (message.action === "getClipboardContent") {
+    navigator.clipboard.readText()
+      .then(text => {
+        sendResponse({success: true, content: text});
+      })
+      .catch(error => {
+        console.error("Error reading clipboard:", error);
+        
+        // Fallback method for environments where direct clipboard access fails
+        const textArea = document.createElement("textarea");
+        textArea.style.position = "fixed";
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.width = "2em";
+        textArea.style.height = "2em";
+        textArea.style.opacity = "0";
+        
+        document.body.appendChild(textArea);
+        textArea.focus();
+        document.execCommand("paste");
+        
+        const clipboardText = textArea.value;
+        document.body.removeChild(textArea);
+        
+        if (clipboardText) {
+          sendResponse({success: true, content: clipboardText});
+        } else {
+          sendResponse({success: false, error: "Could not read clipboard content"});
+        }
+      });
     
-    // Find the active element
+    return true; // Required for async sendResponse
+  }
+  
+  // Handle paste request
+  if (message.action === "pasteResponse" && message.response) {
+    // Get the active element
     const activeElement = document.activeElement;
-    if (activeElement) {
-      activeElement.dispatchEvent(pasteEvent);
-    }
-  } else if (request.action === "directPaste") {
-    // New direct paste method
-    const activeElement = document.activeElement;
-    if (activeElement) {
-      // Check if it's an input or textarea
-      if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') {
-        // Get current selection
+    
+    // Check if the active element is an input or textarea
+    if (activeElement.tagName === 'TEXTAREA' || 
+        activeElement.tagName === 'INPUT' || 
+        activeElement.isContentEditable) {
+      
+      // Handle input and textarea elements
+      if (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT') {
+        // Get the current selection positions
         const startPos = activeElement.selectionStart;
         const endPos = activeElement.selectionEnd;
         
-        // Insert text at cursor position
+        // Get the current value
         const currentValue = activeElement.value;
-        activeElement.value = currentValue.substring(0, startPos) + 
-                             request.text + 
-                             currentValue.substring(endPos);
-                             
-        // Move cursor to end of inserted text
-        activeElement.selectionStart = activeElement.selectionEnd = startPos + request.text.length;
-      } else if (activeElement.isContentEditable) {
-        // For contentEditable elements like rich text editors
-        const selection = window.getSelection();
-        const range = selection.getRangeAt(0);
-        range.deleteContents();
         
-        const textNode = document.createTextNode(request.text);
-        range.insertNode(textNode);
+        // Create the new value with the response inserted
+        const newValue = currentValue.substring(0, startPos) + 
+                        message.response + 
+                        currentValue.substring(endPos);
         
-        // Move cursor to end of inserted text
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
+        // Set the new value
+        activeElement.value = newValue;
+        
+        // Move the cursor to the end of the inserted text
+        activeElement.selectionStart = startPos + message.response.length;
+        activeElement.selectionEnd = startPos + message.response.length;
+      } 
+      // Handle contentEditable elements
+      else if (activeElement.isContentEditable) {
+        // Execute command to paste text
+        document.execCommand('insertText', false, message.response);
       }
+      
+      sendResponse({success: true});
+    } else {
+      // If we're not in an editable field, try to use clipboard API
+      navigator.clipboard.writeText(message.response)
+        .then(() => {
+          chrome.runtime.sendMessage({
+            action: "showNotification", 
+            title: "Copied to Clipboard",
+            message: "The response has been copied to your clipboard."
+          });
+          sendResponse({success: true});
+        })
+        .catch(err => {
+          console.error("Could not copy text: ", err);
+          sendResponse({success: false, error: err.message});
+        });
     }
+    
+    return true; // Required for async sendResponse
   }
 }); 
