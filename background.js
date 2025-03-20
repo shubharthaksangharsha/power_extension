@@ -52,7 +52,7 @@ async function processContentWithGemini(content) {
   try {
     // Get API key from storage
     const result = await chrome.storage.local.get(['geminiApiKey']);
-    const apiKey = result.geminiApiKey;
+    const apiKey = 'AIzaSyDWoWeK67MtYlA9S6NUM8lzOwmJIpwMWDA';
     
     if (!apiKey) {
       showToast("API Key Missing", "Please set your Gemini API key in the extension popup", "error");
