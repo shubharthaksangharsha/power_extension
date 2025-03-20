@@ -16,25 +16,25 @@ async function getClipboardAndSendToGemini() {
     // Get active tab to request clipboard content from it
     const tabs = await chrome.tabs.query({active: true, currentWindow: true});
     if (!tabs || tabs.length === 0) {
-      showToast("ERROR", "error");
+      showIndicator("error");
       return;
     }
     
     // Send message to content script to get clipboard content
     chrome.tabs.sendMessage(tabs[0].id, {action: "getClipboardContent"}, async (response) => {
       if (chrome.runtime.lastError) {
-        showToast("ERROR", "error");
+        showIndicator("error");
         return;
       }
       
       if (!response || !response.success) {
-        showToast("ERROR", "error");
+        showIndicator("error");
         return;
       }
       
       const clipboardContent = response.content;
       if (!clipboardContent) {
-        showToast("EMPTY", "error");
+        showIndicator("error");
         return;
       }
       
@@ -43,7 +43,7 @@ async function getClipboardAndSendToGemini() {
     });
   } catch (error) {
     console.error("Error getting clipboard:", error);
-    showToast("ERROR", "error");
+    showIndicator("error");
   }
 }
 
@@ -52,15 +52,15 @@ async function processContentWithGemini(content) {
   try {
     // Get API key from storage
     const result = await chrome.storage.local.get(['geminiApiKey']);
-    const apiKey = "AIzaSyDWoWeK67MtYlA9S6NUM8lzOwmJIpwMWD0";
+    const apiKey = 'AIzaSyDWoWeK67MtYlA9S6NUM8lzOwmJIpwMWD0';
     
     if (!apiKey) {
-      showToast("NO API KEY", "error");
+      showIndicator("error");
       return;
     }
     
-    // Show toast that request is being processed
-    showToast("PROCESSING", "processing");
+    // Show indicator that request is being processed
+    showIndicator("processing");
     
     // Prepare the request to Gemini API
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
@@ -88,7 +88,7 @@ async function processContentWithGemini(content) {
     const data = await response.json();
     
     if (data.error) {
-      showToast("ERROR", "error");
+      showIndicator("error");
       return;
     }
     
@@ -102,14 +102,14 @@ async function processContentWithGemini(content) {
       // Store the response in extension storage for persistence
       await chrome.storage.local.set({latestGeminiResponse: geminiResponse});
       
-      showToast("READY", "success");
+      showIndicator("success");
     } else {
-      showToast("EMPTY RESPONSE", "error");
+      showIndicator("error");
     }
     
   } catch (error) {
     console.error("Error processing request:", error);
-    showToast("ERROR", "error");
+    showIndicator("error");
   }
 }
 
@@ -126,7 +126,7 @@ async function pasteGeminiResponse() {
     }
     
     if (!response) {
-      showToast("NO RESPONSE", "error");
+      showIndicator("error");
       return;
     }
     
@@ -135,23 +135,22 @@ async function pasteGeminiResponse() {
       if (tabs[0]) {
         chrome.tabs.sendMessage(tabs[0].id, {action: "pasteResponse", response: response});
       } else {
-        showToast("ERROR", "error");
+        showIndicator("error");
       }
     });
     
   } catch (error) {
     console.error("Error pasting response:", error);
-    showToast("ERROR", "error");
+    showIndicator("error");
   }
 }
 
-// Function to show toast via content script
-function showToast(status, type = 'info', duration = 3000) {
+// Function to show indicator via content script
+function showIndicator(type = 'info', duration = 2000) {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     if (tabs[0]) {
       chrome.tabs.sendMessage(tabs[0].id, {
-        action: "showToast",
-        status: status,
+        action: "showIndicator",
         type: type,
         duration: duration
       });
@@ -180,7 +179,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "apiKeySaved") {
     console.log("API key was saved successfully");
-    showToast("API KEY SAVED", "success");
+    showIndicator("success");
     sendResponse({success: true});
     return true;
   }

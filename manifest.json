@@ -49,8 +49,11 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["toast.js"],
+      "resources": ["toast.js", "direct-injector.js"],
       "matches": ["<all_urls>"]
     }
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ]
 } 

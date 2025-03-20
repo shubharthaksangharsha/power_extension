@@ -1,130 +1,85 @@
 // Use an IIFE to avoid polluting the global namespace
 (function() {
-  // Don't recreate the notifier if it already exists
-  if (window.geminiToastNotifier) return;
+  // Don't recreate the indicator if it already exists
+  if (window.geminiColorIndicator) return;
   
-  // Create a minimalist toast notification system
-  class ToastNotifier {
+  // Create an ultra-minimal color square indicator
+  class ColorIndicator {
     constructor() {
-      this.toastContainer = null;
-      this.activeToasts = new Set();
+      this.indicator = null;
+      this.activeTimeout = null;
       this.initialize();
     }
 
     initialize() {
-      // Check if container already exists (to prevent duplicates)
-      if (document.querySelector('.gemini-toast-container')) {
-        this.toastContainer = document.querySelector('.gemini-toast-container');
+      // Check if indicator already exists
+      if (document.querySelector('.gemini-color-indicator')) {
+        this.indicator = document.querySelector('.gemini-color-indicator');
         return;
       }
       
-      // Create the container for toast messages
-      this.toastContainer = document.createElement('div');
-      this.toastContainer.className = 'gemini-toast-container';
+      // Create the indicator square
+      this.indicator = document.createElement('div');
+      this.indicator.className = 'gemini-color-indicator';
       
-      // Apply styles to the container
-      Object.assign(this.toastContainer.style, {
+      // Apply styles to make it a small square
+      Object.assign(this.indicator.style, {
         position: 'fixed',
-        bottom: '20px',
-        right: '20px',
+        top: '10px',
+        right: '10px',
+        width: '10px',
+        height: '10px',
+        borderRadius: '2px',
+        backgroundColor: '#4285f4', // default blue
+        opacity: '0',
         zIndex: '2147483647', // Highest possible z-index
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-        gap: '10px',
-        fontFamily: 'Arial, sans-serif'
+        transition: 'opacity 0.2s ease, background-color 0.2s ease',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+        pointerEvents: 'none' // Make it non-interactive
       });
       
-      // Only add styles if they don't already exist
-      if (!document.getElementById('gemini-toast-styles')) {
-        // Create a style element for the toast animations
-        const style = document.createElement('style');
-        style.id = 'gemini-toast-styles';
-        style.textContent = `
-          @keyframes gemini-toast-fade-in {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          
-          @keyframes gemini-toast-fade-out {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(20px); }
-          }
-          
-          .gemini-toast {
-            padding: 10px 16px;
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            background-color: #4285f4;
-            color: white;
-            font-size: 14px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-            animation: gemini-toast-fade-in 0.3s ease forwards;
-            display: flex;
-            align-items: center;
-            min-width: 80px;
-            justify-content: center;
-            text-transform: uppercase;
-          }
-          
-          .gemini-toast.success {
-            background-color: #34a853;
-          }
-          
-          .gemini-toast.error {
-            background-color: #ea4335;
-          }
-          
-          .gemini-toast.processing {
-            background-color: #fbbc05;
-          }
-        `;
-        
-        // Append style to the document
-        document.head.appendChild(style);
-      }
-      
-      // Append container to the document
-      document.body.appendChild(this.toastContainer);
+      // Append to document
+      document.body.appendChild(this.indicator);
     }
 
-    showToast(status, type = 'info', duration = 3000) {
-      // Create the toast element
-      const toast = document.createElement('div');
-      toast.className = `gemini-toast ${type}`;
+    show(type = 'info', duration = 2000) {
+      // Clear any existing timeout
+      if (this.activeTimeout) {
+        clearTimeout(this.activeTimeout);
+      }
       
-      // Set the status text
-      toast.textContent = status;
+      // Set color based on type
+      switch (type) {
+        case 'success':
+          this.indicator.style.backgroundColor = '#34a853'; // green
+          break;
+        case 'error':
+          this.indicator.style.backgroundColor = '#ea4335'; // red
+          break;
+        case 'processing':
+          this.indicator.style.backgroundColor = '#fbbc05'; // yellow
+          break;
+        default:
+          this.indicator.style.backgroundColor = '#4285f4'; // blue
+      }
       
-      // Add the toast to the container
-      this.toastContainer.appendChild(toast);
-      this.activeToasts.add(toast);
+      // Show the indicator
+      this.indicator.style.opacity = '1';
       
-      // Set up automatic removal
-      setTimeout(() => {
-        this.removeToast(toast);
+      // Set timeout to hide
+      this.activeTimeout = setTimeout(() => {
+        this.hide();
       }, duration);
-      
-      return toast;
     }
     
-    removeToast(toast) {
-      if (!this.activeToasts.has(toast)) return;
-      
-      // Add fade-out animation
-      toast.style.animation = 'gemini-toast-fade-out 0.3s ease forwards';
-      
-      // Remove after animation completes
-      setTimeout(() => {
-        if (toast.parentNode === this.toastContainer) {
-          this.toastContainer.removeChild(toast);
-        }
-        this.activeToasts.delete(toast);
-      }, 300);
+    hide() {
+      if (this.indicator) {
+        this.indicator.style.opacity = '0';
+      }
+      this.activeTimeout = null;
     }
   }
 
-  // Create the toast notifier instance
-  window.geminiToastNotifier = new ToastNotifier();
+  // Create the indicator instance
+  window.geminiColorIndicator = new ColorIndicator();
 })(); 
