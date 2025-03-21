@@ -189,8 +189,220 @@ function showDirectIndicator(type = 'info', duration = 2000) {
   return indicator;
 }
 
-// Clean up any existing notification elements that might have text
-function cleanupTextNotifications() {
+// Show notification based on user preference
+async function showNotification(status, type = 'info', duration = 3000) {
+  try {
+    // Get user preference
+    const result = await chrome.storage.local.get(['minimalistMode']);
+    console.log("Minimalist mode setting:", result.minimalistMode);
+    
+    // Note: If minimalistMode is undefined, default to true
+    // But if it's explicitly set to false, use detailed mode
+    const minimalistMode = result.minimalistMode !== false; 
+    
+    // Special messaging based on type
+    let message;
+    switch (type) {
+      case 'success':
+        message = status || 'Success';
+        break;
+      case 'error':
+        message = status || 'Error occurred';
+        break;
+      case 'processing':
+        message = status || 'Processing request';
+        break;
+      default:
+        message = status || 'Information';
+    }
+    
+    // Check if we're in Jupyter notebook environment
+    const isJupyter = window.location.href.includes('jupyter') || 
+                     document.querySelector('.jp-Notebook') || 
+                     document.querySelector('.notebook_app');
+    
+    console.log("Is Jupyter environment:", isJupyter);
+    console.log("Using notification style:", minimalistMode ? "minimalist" : "detailed");
+    
+    // Use the appropriate notification style based on user preference
+    if (minimalistMode) {
+      // If minimalist mode is on, always use color square
+      return showDirectIndicator(type, 2000);
+    } else {
+      // In detail mode, use appropriate method based on environment
+      if (isJupyter) {
+        // In Jupyter, use a special detailed notification that works in that environment
+        return showJupyterDetailedToast(message, type, duration);
+      } else {
+        // In regular environments, use standard detailed toast
+        return showDetailedToast(message, type, duration);
+      }
+    }
+  } catch (err) {
+    console.error("Error determining notification style:", err);
+    // Fallback to minimalist as default in case of error
+    return showDirectIndicator(type, 2000);
+  }
+}
+
+// Create a Jupyter-specific detailed toast notification
+function showJupyterDetailedToast(message, type = 'info', duration = 3000) {
+  // Create a floating notification that works in Jupyter's CSP environment
+  const toast = document.createElement('div');
+  
+  // Set color based on type
+  let bgColor = '#4285f4'; // info (blue)
+  let statusText = 'Info';
+  
+  switch (type) {
+    case 'success':
+      bgColor = '#34a853'; // green
+      statusText = 'Success';
+      break;
+    case 'error':
+      bgColor = '#ea4335'; // red
+      statusText = 'Error';
+      break;
+    case 'processing':
+      bgColor = '#fbbc05'; // yellow
+      statusText = 'Processing';
+      break;
+  }
+  
+  // Apply styles (avoid using innerHTML for better CSP compatibility)
+  Object.assign(toast.style, {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    backgroundColor: 'white',
+    color: '#333',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    zIndex: '2147483647',
+    fontFamily: 'Arial, sans-serif',
+    fontSize: '14px',
+    maxWidth: '300px',
+    opacity: '0',
+    transform: 'translateY(20px)',
+    transition: 'opacity 0.3s ease, transform 0.3s ease',
+    borderLeft: `4px solid ${bgColor}`
+  });
+  
+  // Create title element
+  const titleEl = document.createElement('div');
+  titleEl.textContent = statusText;
+  titleEl.style.fontWeight = 'bold';
+  titleEl.style.marginBottom = '4px';
+  
+  // Create message element
+  const messageEl = document.createElement('div');
+  messageEl.textContent = message;
+  
+  // Append elements to toast
+  toast.appendChild(titleEl);
+  toast.appendChild(messageEl);
+  
+  // Add to page
+  document.body.appendChild(toast);
+  
+  // Trigger animation
+  setTimeout(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  }, 10);
+  
+  // Remove after duration
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, duration);
+  
+  return toast;
+}
+
+// Create a detailed toast notification for regular environments
+function showDetailedToast(message, type = 'info', duration = 3000) {
+  // Create a floating notification
+  const toast = document.createElement('div');
+  
+  // Set color based on type
+  let bgColor = '#4285f4'; // info (blue)
+  let statusText = 'Info';
+  
+  switch (type) {
+    case 'success':
+      bgColor = '#34a853'; // green
+      statusText = 'Success';
+      break;
+    case 'error':
+      bgColor = '#ea4335'; // red
+      statusText = 'Error';
+      break;
+    case 'processing':
+      bgColor = '#fbbc05'; // yellow
+      statusText = 'Processing';
+      break;
+  }
+  
+  // Apply styles
+  Object.assign(toast.style, {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    backgroundColor: 'white',
+    color: '#333',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    zIndex: '2147483647',
+    fontFamily: 'Arial, sans-serif',
+    fontSize: '14px',
+    maxWidth: '300px',
+    opacity: '0',
+    transform: 'translateY(20px)',
+    transition: 'opacity 0.3s ease, transform 0.3s ease',
+    borderLeft: `4px solid ${bgColor}`
+  });
+  
+  // Set content
+  toast.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 4px;">${statusText}</div>
+    <div>${message}</div>
+  `;
+  
+  // Add to page
+  document.body.appendChild(toast);
+  
+  // Trigger animation
+  setTimeout(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  }, 10);
+  
+  // Remove after duration
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, duration);
+  
+  return toast;
+}
+
+// Clean up any existing notification elements
+function cleanupNotifications() {
   // Find and remove any text-based notification elements
   const notificationElements = document.querySelectorAll('.sending-notification, .gemini-toast, .toast-notification, .notification-text');
   notificationElements.forEach(element => {
@@ -198,131 +410,12 @@ function cleanupTextNotifications() {
       element.parentNode.removeChild(element);
     }
   });
-  
-  // Check for any elements with "SENDING", "PROCESSING", etc. text
-  const allElements = document.body.querySelectorAll('*');
-  for (let i = 0; i < allElements.length; i++) {
-    const element = allElements[i];
-    if (element.textContent && 
-        (element.textContent.includes('SENDING') || 
-         element.textContent.includes('PROCESSING') || 
-         element.textContent.includes('READY') ||
-         element.textContent.includes('ERROR'))) {
-      // Check if this is likely one of our notification elements
-      const styles = window.getComputedStyle(element);
-      if (styles.position === 'fixed' && 
-          (styles.bottom === '0px' || parseInt(styles.bottom) < 50) &&
-          element !== document.body) {
-        if (element.parentNode) {
-          element.parentNode.removeChild(element);
-        }
-      }
-    }
-  }
 }
 
-// Show indicator - works in all environments, no text
-function showIndicator(type = 'info', duration = 2000) {
-  // Clean up any existing notifications with text
-  cleanupTextNotifications();
-  
-  // In Jupyter or CSP environments, always use direct DOM approach
-  if (window.location.href.includes('jupyter') || 
-      document.querySelector('.jp-Notebook') || 
-      document.querySelector('.notebook_app')) {
-    return showDirectIndicator(type, duration);
-  }
-  
-  // For regular environments, try the script-based approach first
-  try {
-    // Dispatch event for the injected script
-    const customEvent = new CustomEvent('gemini-indicator-show', {
-      detail: {
-        type: type,
-        duration: duration
-      }
-    });
-    document.dispatchEvent(customEvent);
-    
-    // If we don't see the indicator appear, fall back to direct approach
-    setTimeout(() => {
-      const injectedIndicator = document.querySelector('.gemini-color-indicator');
-      if (!injectedIndicator || injectedIndicator.style.opacity !== '1') {
-        showDirectIndicator(type, duration);
-      }
-    }, 50);
-  } catch (e) {
-    console.error('Failed to show indicator via event, using fallback:', e);
-    return showDirectIndicator(type, duration);
-  }
-}
-
-// Add listener for indicator communication with page scripts
-function setupIndicatorListener() {
-  try {
-    if (!window.hasGeminiIndicatorListener) {
-      document.addEventListener('gemini-indicator-show', function(e) {
-        if (window.geminiColorIndicator && e.detail) {
-          window.geminiColorIndicator.show(
-            e.detail.type, 
-            e.detail.duration
-          );
-        } else {
-          // Fallback if the window object isn't available
-          showDirectIndicator(e.detail.type, e.detail.duration);
-        }
-      });
-      window.hasGeminiIndicatorListener = true;
-    }
-  } catch (e) {
-    console.error('Error setting up indicator listener:', e);
-  }
-}
-
-// MutationObserver to remove any text indicators that might appear
-function setupObserver() {
-  const observer = new MutationObserver(mutations => {
-    for (const mutation of mutations) {
-      if (mutation.addedNodes.length) {
-        // Check if any added nodes might be our text notifications
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const element = node;
-            
-            // Check if this element has text like "SENDING", etc.
-            if (element.textContent && 
-                (element.textContent.includes('SENDING') || 
-                 element.textContent.includes('PROCESSING') || 
-                 element.textContent.includes('READY') ||
-                 element.textContent.includes('ERROR'))) {
-              
-              // Check if this is likely one of our notification elements
-              const styles = window.getComputedStyle(element);
-              if (styles.position === 'fixed' && 
-                  (styles.bottom === '0px' || parseInt(styles.bottom) < 50) &&
-                  element !== document.body) {
-                // Remove it
-                if (element.parentNode) {
-                  element.parentNode.removeChild(element);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
-  
-  // Start observing
-  observer.observe(document.body, { childList: true, subtree: true });
-}
-
-// Initialize on page load
+// Add listener for notification events
 document.addEventListener('DOMContentLoaded', function() {
   initializeIndicator();
-  setupIndicatorListener();
-  setupObserver();
-  cleanupTextNotifications();
+  cleanupNotifications();
 });
 
 // Listen for messages from the background script
@@ -331,13 +424,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   initializeToastSystem();
   
   // Handle notification request
-  if (message.action === "showToast") {
-    showToast(
+  if (message.action === "showNotification") {
+    showNotification(
       message.status,
       message.type || 'info', 
       message.duration || 3000
-    );
-    sendResponse({success: true});
+    ).then(() => {
+      sendResponse({success: true});
+    }).catch(err => {
+      console.error("Error showing notification:", err);
+      sendResponse({success: false, error: err.message});
+    });
     return true;
   }
   
@@ -345,7 +442,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "getClipboardContent") {
     navigator.clipboard.readText()
       .then(text => {
-        showIndicator("processing");
+        showNotification("Sending to Gemini", "processing");
         sendResponse({success: true, content: text});
       })
       .catch(error => {
@@ -368,10 +465,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         document.body.removeChild(textArea);
         
         if (clipboardText) {
-          showIndicator("processing");
+          showNotification("Sending to Gemini", "processing");
           sendResponse({success: true, content: clipboardText});
         } else {
-          showIndicator("error");
+          showNotification("Failed to read clipboard", "error");
           sendResponse({success: false, error: "Could not read clipboard content"});
         }
       });
@@ -410,13 +507,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         activeElement.selectionStart = startPos + message.response.length;
         activeElement.selectionEnd = startPos + message.response.length;
         
-        showIndicator("success");
+        showNotification("Response pasted", "success");
       } 
       // Handle contentEditable elements
       else if (activeElement.isContentEditable) {
         // Execute command to paste text
         document.execCommand('insertText', false, message.response);
-        showIndicator("success");
+        showNotification("Response pasted", "success");
       }
       
       sendResponse({success: true});
@@ -424,26 +521,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // If we're not in an editable field, try to use clipboard API
       navigator.clipboard.writeText(message.response)
         .then(() => {
-          showIndicator("success");
+          showNotification("Copied to clipboard", "success");
           sendResponse({success: true});
         })
         .catch(err => {
           console.error("Could not copy text: ", err);
-          showIndicator("error");
+          showNotification("Failed to copy response", "error");
           sendResponse({success: false, error: err.message});
         });
     }
     
     return true; // Required for async sendResponse
-  }
-  
-  // Handle indicator request
-  if (message.action === "showIndicator") {
-    showIndicator(
-      message.type || 'info', 
-      message.duration || 2000
-    );
-    sendResponse({success: true});
-    return true;
   }
 }); 

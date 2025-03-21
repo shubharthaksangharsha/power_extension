@@ -16,25 +16,25 @@ async function getClipboardAndSendToGemini() {
     // Get active tab to request clipboard content from it
     const tabs = await chrome.tabs.query({active: true, currentWindow: true});
     if (!tabs || tabs.length === 0) {
-      showIndicator("error");
+      showNotification("No active tab found", "error");
       return;
     }
     
     // Send message to content script to get clipboard content
     chrome.tabs.sendMessage(tabs[0].id, {action: "getClipboardContent"}, async (response) => {
       if (chrome.runtime.lastError) {
-        showIndicator("error");
+        showNotification("Failed to communicate with page", "error");
         return;
       }
       
       if (!response || !response.success) {
-        showIndicator("error");
+        showNotification("Failed to read clipboard", "error");
         return;
       }
       
       const clipboardContent = response.content;
       if (!clipboardContent) {
-        showIndicator("error");
+        showNotification("Empty clipboard", "error");
         return;
       }
       
@@ -43,7 +43,7 @@ async function getClipboardAndSendToGemini() {
     });
   } catch (error) {
     console.error("Error getting clipboard:", error);
-    showIndicator("error");
+    showNotification("Failed to get clipboard content", "error");
   }
 }
 
@@ -52,15 +52,15 @@ async function processContentWithGemini(content) {
   try {
     // Get API key from storage
     const result = await chrome.storage.local.get(['geminiApiKey']);
-    const apiKey = 'AIzaSyDWoWeK67MtYlA9S6NUM8lzOwmJIpwMWD0';
+    const apiKey = result.geminiApiKey;
     
     if (!apiKey) {
-      showIndicator("error");
+      showNotification("API key missing", "error");
       return;
     }
     
     // Show indicator that request is being processed
-    showIndicator("processing");
+    showNotification("Processing request", "processing");
     
     // Prepare the request to Gemini API
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
@@ -88,7 +88,7 @@ async function processContentWithGemini(content) {
     const data = await response.json();
     
     if (data.error) {
-      showIndicator("error");
+      showNotification("API error: " + data.error.message, "error");
       return;
     }
     
@@ -102,14 +102,14 @@ async function processContentWithGemini(content) {
       // Store the response in extension storage for persistence
       await chrome.storage.local.set({latestGeminiResponse: geminiResponse});
       
-      showIndicator("success");
+      showNotification("Response ready (Ctrl+M to paste)", "success");
     } else {
-      showIndicator("error");
+      showNotification("Empty response from Gemini", "error");
     }
     
   } catch (error) {
     console.error("Error processing request:", error);
-    showIndicator("error");
+    showNotification("Failed to process request", "error");
   }
 }
 
@@ -126,7 +126,7 @@ async function pasteGeminiResponse() {
     }
     
     if (!response) {
-      showIndicator("error");
+      showNotification("No response available", "error");
       return;
     }
     
@@ -135,22 +135,23 @@ async function pasteGeminiResponse() {
       if (tabs[0]) {
         chrome.tabs.sendMessage(tabs[0].id, {action: "pasteResponse", response: response});
       } else {
-        showIndicator("error");
+        showNotification("Cannot paste in current context", "error");
       }
     });
     
   } catch (error) {
     console.error("Error pasting response:", error);
-    showIndicator("error");
+    showNotification("Failed to paste response", "error");
   }
 }
 
-// Function to show indicator via content script
-function showIndicator(type = 'info', duration = 2000) {
+// Function to show notification via content script
+function showNotification(status, type = 'info', duration = 3000) {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     if (tabs[0]) {
       chrome.tabs.sendMessage(tabs[0].id, {
-        action: "showIndicator",
+        action: "showNotification",
+        status: status,
         type: type,
         duration: duration
       });
@@ -179,8 +180,22 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "apiKeySaved") {
     console.log("API key was saved successfully");
-    showIndicator("success");
+    showNotification("API key saved", "success");
     sendResponse({success: true});
+    return true;
+  }
+  
+  if (message.action === "testNotification") {
+    console.log("Testing notification with minimalist mode:", message.minimalistMode);
+    // Force storage update first to ensure the new setting is used
+    chrome.storage.local.set({minimalistMode: message.minimalistMode}, function() {
+      // Then show a test notification
+      if (message.minimalistMode) {
+        showNotification("Test notification", "info");
+      } else {
+        showNotification("Display mode changed to detailed", "info");
+      }
+    });
     return true;
   }
   
