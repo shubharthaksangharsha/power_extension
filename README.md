@@ -2,7 +2,7 @@
 
 A Chrome extension that sends clipboard content to Google's Gemini 2.0 Flash API and allows you to paste responses with keyboard shortcuts.
 
-![Gemini Clipboard Assistant](myicon.png)
+![Gemini Clipboard Assistant](window-screen.png)
 
 ## Features
 
