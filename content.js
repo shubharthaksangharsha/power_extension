@@ -440,6 +440,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Handle request to get clipboard content
   if (message.action === "getClipboardContent") {
+    // Try modern clipboard API first
     navigator.clipboard.readText()
       .then(text => {
         showNotification("Sending to Gemini", "processing");
@@ -448,89 +449,80 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(error => {
         console.error("Error reading clipboard:", error);
         
-        // Fallback method for environments where direct clipboard access fails
-        const textArea = document.createElement("textarea");
-        textArea.style.position = "fixed";
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.width = "2em";
-        textArea.style.height = "2em";
-        textArea.style.opacity = "0";
-        
-        document.body.appendChild(textArea);
-        textArea.focus();
-        document.execCommand("paste");
-        
-        const clipboardText = textArea.value;
-        document.body.removeChild(textArea);
-        
-        if (clipboardText) {
-          showNotification("Sending to Gemini", "processing");
-          sendResponse({success: true, content: clipboardText});
-        } else {
-          showNotification("Failed to read clipboard", "error");
-          sendResponse({success: false, error: "Could not read clipboard content"});
+        // Enhanced fallback method
+        try {
+          const textArea = document.createElement("textarea");
+          textArea.style.position = "fixed";
+          textArea.style.top = "0";
+          textArea.style.left = "0";
+          textArea.style.width = "2em";
+          textArea.style.height = "2em";
+          textArea.style.opacity = "0";
+          textArea.style.padding = "0";
+          
+          document.body.appendChild(textArea);
+          textArea.focus();
+          
+          // Try both paste methods
+          const successful = document.execCommand("paste") || textArea.paste();
+          
+          const clipboardText = textArea.value;
+          document.body.removeChild(textArea);
+          
+          if (clipboardText) {
+            showNotification("Sending to Gemini", "processing");
+            sendResponse({success: true, content: clipboardText});
+          } else {
+            showNotification("Failed to read clipboard", "error");
+            sendResponse({success: false, error: "Could not read clipboard content"});
+          }
+        } catch (fallbackError) {
+          console.error("Fallback clipboard method failed:", fallbackError);
+          showNotification("Failed to access clipboard", "error");
+          sendResponse({success: false, error: "Clipboard access failed"});
         }
       });
     
     return true; // Required for async sendResponse
   }
   
-  // Handle paste request
-  if (message.action === "pasteResponse" && message.response) {
-    // Get the active element
-    const activeElement = document.activeElement;
-    
-    // Check if the active element is an input or textarea
-    if (activeElement.tagName === 'TEXTAREA' || 
-        activeElement.tagName === 'INPUT' || 
-        activeElement.isContentEditable) {
-      
-      // Handle input and textarea elements
-      if (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT') {
-        // Get the current selection positions
-        const startPos = activeElement.selectionStart;
-        const endPos = activeElement.selectionEnd;
+  // Add a new handler for paste operations
+  if (message.action === "pasteContent") {
+    try {
+        const text = message.content;
         
-        // Get the current value
-        const currentValue = activeElement.value;
-        
-        // Create the new value with the response inserted
-        const newValue = currentValue.substring(0, startPos) + 
-                        message.response + 
-                        currentValue.substring(endPos);
-        
-        // Set the new value
-        activeElement.value = newValue;
-        
-        // Move the cursor to the end of the inserted text
-        activeElement.selectionStart = startPos + message.response.length;
-        activeElement.selectionEnd = startPos + message.response.length;
-        
-        showNotification("Response pasted", "success");
-      } 
-      // Handle contentEditable elements
-      else if (activeElement.isContentEditable) {
-        // Execute command to paste text
-        document.execCommand('insertText', false, message.response);
-        showNotification("Response pasted", "success");
-      }
-      
-      sendResponse({success: true});
-    } else {
-      // If we're not in an editable field, try to use clipboard API
-      navigator.clipboard.writeText(message.response)
-        .then(() => {
-          showNotification("Copied to clipboard", "success");
-          sendResponse({success: true});
-        })
-        .catch(err => {
-          console.error("Could not copy text: ", err);
-          showNotification("Failed to copy response", "error");
-          sendResponse({success: false, error: err.message});
-        });
+        // Try modern clipboard API first
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                // After writing to clipboard, try to paste
+                const activeElement = document.activeElement;
+                if (activeElement && (activeElement.isContentEditable || 
+                    activeElement.tagName === 'TEXTAREA' || 
+                    activeElement.tagName === 'INPUT')) {
+                    
+                    // For editable elements, try to insert text directly
+                    const start = activeElement.selectionStart;
+                    const end = activeElement.selectionEnd;
+                    const currentValue = activeElement.value || '';
+                    activeElement.value = currentValue.substring(0, start) + 
+                                        text + 
+                                        currentValue.substring(end);
+                } else {
+                    // Fallback to execCommand
+                    document.execCommand('paste');
+                }
+                sendResponse({success: true});
+            })
+            .catch(error => {
+                console.error("Paste operation failed:", error);
+                showNotification("Failed to paste content", "error");
+                sendResponse({success: false, error: error.message});
+            });
+    } catch (error) {
+        console.error("Paste error:", error);
+        showNotification("Failed to paste content", "error");
+        sendResponse({success: false, error: error.message});
     }
-    
-    return true; // Required for async sendResponse
+    return true;
   }
 }); 

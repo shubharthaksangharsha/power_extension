@@ -2,11 +2,11 @@
 let geminiResponse = "";
 
 // Listen for keyboard shortcuts
-chrome.commands.onCommand.addListener(async (command) => {
+chrome.commands.onCommand.addListener((command) => {
   if (command === "send-to-gemini") {
-    await getClipboardAndSendToGemini();
+    getClipboardAndSendToGemini();
   } else if (command === "paste-response") {
-    await pasteGeminiResponse();
+    pasteGeminiResponse();
   }
 });
 
@@ -116,29 +116,29 @@ async function processContentWithGemini(content) {
 // Function to paste Gemini response
 async function pasteGeminiResponse() {
   try {
-    // Try to get response from memory first
-    let response = geminiResponse;
-    
-    // If not in memory, try to get from storage
-    if (!response) {
-      const result = await chrome.storage.local.get(['latestGeminiResponse']);
-      response = result.latestGeminiResponse;
-    }
-    
-    if (!response) {
-      showNotification("No response available", "error");
+    // Get the stored response
+    const response = await chrome.storage.local.get('lastGeminiResponse');
+    if (!response.lastGeminiResponse) {
+      showNotification("No response to paste", "error");
       return;
     }
-    
-    // Send message to content script to handle pasting
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, {action: "pasteResponse", response: response});
-      } else {
-        showNotification("Cannot paste in current context", "error");
+
+    // Get active tab
+    const tabs = await chrome.tabs.query({active: true, currentWindow: true});
+    if (!tabs || tabs.length === 0) {
+      showNotification("No active tab found", "error");
+      return;
+    }
+
+    // Send paste message to content script
+    chrome.tabs.sendMessage(tabs[0].id, {
+      action: "pasteContent",
+      content: response.lastGeminiResponse
+    }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.success) {
+        showNotification("Failed to paste content", "error");
       }
     });
-    
   } catch (error) {
     console.error("Error pasting response:", error);
     showNotification("Failed to paste response", "error");
