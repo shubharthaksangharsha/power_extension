@@ -523,6 +523,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         showNotification("Failed to paste content", "error");
         sendResponse({success: false, error: error.message});
     }
-    return true;
+    
+    return true; // Required for async sendResponse
   }
 }); 

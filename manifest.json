@@ -36,7 +36,7 @@
     },
     "paste-response": {
       "suggested_key": {
-        "default": "Ctrl+M"
+        "default": "Ctrl+Y"
       },
       "description": "Paste Gemini's response"
     }
