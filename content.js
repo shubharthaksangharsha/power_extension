@@ -1,3 +1,6 @@
+// Add this near the top of the file
+console.log("Content script loaded"); // Debug log
+
 // Initialize toast notification system
 function initializeToastSystem() {
   // Inject the toast script as a file (more CSP-friendly)
@@ -420,6 +423,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("Message received in content script:", message); // Debug log
+  
   // Initialize toast system if it hasn't been already
   initializeToastSystem();
   
@@ -486,20 +491,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Required for async sendResponse
   }
   
-  // Add a new handler for paste operations
+  // Modify the paste handler
   if (message.action === "pasteContent") {
+    console.log("Handling paste content action"); // Debug log
     try {
         const text = message.content;
+        console.log("Content to paste:", text); // Debug log
         
         // Try modern clipboard API first
         navigator.clipboard.writeText(text)
             .then(() => {
+                console.log("Successfully wrote to clipboard"); // Debug log
                 // After writing to clipboard, try to paste
                 const activeElement = document.activeElement;
+                console.log("Active element:", activeElement); // Debug log
+                console.log("Active element tag:", activeElement?.tagName); // Debug log
+                console.log("Is contentEditable:", activeElement?.isContentEditable); // Debug log
+                
                 if (activeElement && (activeElement.isContentEditable || 
                     activeElement.tagName === 'TEXTAREA' || 
                     activeElement.tagName === 'INPUT')) {
                     
+                    console.log("Using direct insertion method"); // Debug log
                     // For editable elements, try to insert text directly
                     const start = activeElement.selectionStart;
                     const end = activeElement.selectionEnd;
@@ -507,19 +520,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     activeElement.value = currentValue.substring(0, start) + 
                                         text + 
                                         currentValue.substring(end);
+                    console.log("Direct insertion completed"); // Debug log
                 } else {
+                    console.log("Falling back to execCommand paste"); // Debug log
                     // Fallback to execCommand
-                    document.execCommand('paste');
+                    const result = document.execCommand('paste');
+                    console.log("execCommand paste result:", result); // Debug log
                 }
+                showNotification("Content pasted successfully", "success");
                 sendResponse({success: true});
             })
             .catch(error => {
-                console.error("Paste operation failed:", error);
+                console.error("Clipboard API error:", error); // Debug log
                 showNotification("Failed to paste content", "error");
                 sendResponse({success: false, error: error.message});
             });
     } catch (error) {
-        console.error("Paste error:", error);
+        console.error("Paste operation error:", error); // Debug log
         showNotification("Failed to paste content", "error");
         sendResponse({success: false, error: error.message});
     }

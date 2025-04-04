@@ -3,9 +3,14 @@ let geminiResponse = "";
 
 // Listen for keyboard shortcuts
 chrome.commands.onCommand.addListener((command) => {
+  console.log("Command received:", command); // Debug log
+
   if (command === "send-to-gemini") {
+    console.log("Initiating send to Gemini..."); // Debug log
     getClipboardAndSendToGemini();
   } else if (command === "paste-response") {
+    console.log("Initiating paste response..."); // Debug log
+    console.log("Current Gemini response:", geminiResponse); // Debug log
     pasteGeminiResponse();
   }
 });
@@ -116,32 +121,31 @@ async function processContentWithGemini(content) {
 // Function to paste Gemini response
 async function pasteGeminiResponse() {
   try {
-    // Get the stored response
-    const response = await chrome.storage.local.get('lastGeminiResponse');
-    if (!response.lastGeminiResponse) {
-      showNotification("No response to paste", "error");
+    if (!geminiResponse) {
+      console.log("No Gemini response available to paste"); // Debug log
       return;
     }
 
-    // Get active tab
-    const tabs = await chrome.tabs.query({active: true, currentWindow: true});
-    if (!tabs || tabs.length === 0) {
-      showNotification("No active tab found", "error");
+    console.log("Attempting to paste response:", geminiResponse); // Debug log
+
+    // Get the active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      console.error("No active tab found"); // Debug log
       return;
     }
 
-    // Send paste message to content script
-    chrome.tabs.sendMessage(tabs[0].id, {
+    console.log("Sending paste message to content script in tab:", tab.id); // Debug log
+
+    // Send message to content script
+    const response = await chrome.tabs.sendMessage(tab.id, {
       action: "pasteContent",
-      content: response.lastGeminiResponse
-    }, (response) => {
-      if (chrome.runtime.lastError || !response || !response.success) {
-        showNotification("Failed to paste content", "error");
-      }
+      content: geminiResponse
     });
+
+    console.log("Paste response from content script:", response); // Debug log
   } catch (error) {
-    console.error("Error pasting response:", error);
-    showNotification("Failed to paste response", "error");
+    console.error("Error in pasteGeminiResponse:", error); // Debug log
   }
 }
 
