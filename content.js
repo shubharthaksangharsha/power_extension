@@ -192,6 +192,12 @@ function showDirectIndicator(type = 'info', duration = 2000) {
 // Show notification based on user preference
 async function showNotification(status, type = 'info', duration = 3000) {
   try {
+    // Force detailed mode in Edge for better visibility
+    const isEdge = navigator.userAgent.includes("Edg");
+    if (isEdge) {
+        return showFallbackToast(status, type, duration);
+    }
+    
     // Get user preference
     const result = await chrome.storage.local.get(['minimalistMode']);
     console.log("Minimalist mode setting:", result.minimalistMode);
@@ -491,36 +497,78 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
         const text = message.content;
         
-        // Try modern clipboard API first
-        navigator.clipboard.writeText(text)
-            .then(() => {
-                // After writing to clipboard, try to paste
+        // Try multiple paste methods
+        const pasteSuccess = async () => {
+            // Method 1: Try modern clipboard API
+            try {
+                await navigator.clipboard.writeText(text);
+                
+                // Get active element
                 const activeElement = document.activeElement;
+                
+                // Method 2: Try direct input insertion for editable elements
                 if (activeElement && (activeElement.isContentEditable || 
                     activeElement.tagName === 'TEXTAREA' || 
                     activeElement.tagName === 'INPUT')) {
                     
-                    // For editable elements, try to insert text directly
-                    const start = activeElement.selectionStart;
-                    const end = activeElement.selectionEnd;
-                    const currentValue = activeElement.value || '';
-                    activeElement.value = currentValue.substring(0, start) + 
-                                        text + 
-                                        currentValue.substring(end);
-                } else {
-                    // Fallback to execCommand
-                    document.execCommand('paste');
+                    // For editable elements, insert text directly
+                    if (typeof activeElement.setRangeText === 'function') {
+                        // Use setRangeText if available
+                        const start = activeElement.selectionStart || 0;
+                        const end = activeElement.selectionEnd || 0;
+                        activeElement.setRangeText(text, start, end, 'end');
+                        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+                    } else {
+                        // Fallback to value property
+                        const start = activeElement.selectionStart || 0;
+                        const end = activeElement.selectionEnd || 0;
+                        const currentValue = activeElement.value || '';
+                        activeElement.value = currentValue.substring(0, start) + 
+                                            text + 
+                                            currentValue.substring(end);
+                        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    return true;
                 }
+                
+                // Method 3: Try execCommand with clipboard data
+                else {
+                    const result = document.execCommand('insertText', false, text);
+                    if (result) return true;
+                }
+                
+                // Method 4: Create and trigger a paste event
+                const pasteEvent = new ClipboardEvent('paste', {
+                    bubbles: true,
+                    cancelable: true,
+                    clipboardData: new DataTransfer()
+                });
+                Object.defineProperty(pasteEvent.clipboardData, 'getData', {
+                    value: () => text
+                });
+                document.activeElement.dispatchEvent(pasteEvent);
+                
+                return true;
+            } catch (err) {
+                console.error("Paste method failed:", err);
+                return false;
+            }
+        };
+
+        // Execute paste attempts
+        pasteSuccess().then(success => {
+            if (success) {
+                showNotification("Content pasted successfully", "success");
                 sendResponse({success: true});
-            })
-            .catch(error => {
-                console.error("Paste operation failed:", error);
-                showNotification("Failed to paste content", "error");
-                sendResponse({success: false, error: error.message});
-            });
+            } else {
+                showNotification("Failed to paste content - Please try manual paste (Ctrl+V)", "error");
+                sendResponse({success: false, error: "Paste operation failed"});
+            }
+        });
+        
     } catch (error) {
         console.error("Paste error:", error);
-        showNotification("Failed to paste content", "error");
+        showNotification("Failed to paste content - Please try manual paste (Ctrl+V)", "error");
         sendResponse({success: false, error: error.message});
     }
     
