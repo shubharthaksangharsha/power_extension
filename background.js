@@ -102,7 +102,7 @@ async function processContentWithGemini(content) {
       // Store the response in extension storage for persistence
       await chrome.storage.local.set({latestGeminiResponse: geminiResponse});
       
-      showNotification("Response ready (Ctrl+M to paste)", "success");
+      showNotification("Response ready (Ctrl+Y to paste)", "success");
     } else {
       showNotification("Empty response from Gemini", "error");
     }

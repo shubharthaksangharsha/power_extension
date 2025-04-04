@@ -51,7 +51,7 @@ A Chrome extension that sends clipboard content to Google's Gemini 2.0 Flash API
 1. Select text on any webpage
 2. Right-click and select "Send to Gemini"
 3. Wait for the response
-4. Press `Ctrl+M` to paste the response
+4. Press `Ctrl+Y` to paste the response
 
 ## Notification Styles
 
