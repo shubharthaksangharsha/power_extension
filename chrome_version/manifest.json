@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Clipboard Assistant",
+  "version": "1.0",
+  "description": "Send clipboard content to Gemini API and paste the response",
+  "permissions": [
+    "clipboardRead",
+    "clipboardWrite",
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "myicon.png",
+      "48": "myicon.png",
+      "128": "myicon.png"
+    }
+  },
+  "icons": {
+    "16": "myicon.png",
+    "48": "myicon.png",
+    "128": "myicon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "send-to-gemini": {
+      "suggested_key": {
+        "default": "Ctrl+I"
+      },
+      "description": "Send clipboard to Gemini"
+    },
+    "paste-response": {
+      "suggested_key": {
+        "default": "Ctrl+M"
+      },
+      "description": "Paste Gemini's response"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["toast.js", "direct-injector.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ]
+} 

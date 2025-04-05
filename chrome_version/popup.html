@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gemini Clipboard Assistant</title>
+  <style>
+    body {
+      width: 300px;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    input[type="password"], input[type="text"] {
+      padding: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 8px 12px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #3367d6;
+    }
+    .shortcuts {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f1f3f4;
+      border-radius: 4px;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      display: none;
+    }
+    .success {
+      background-color: #e6f4ea;
+      color: #137333;
+      display: block;
+    }
+    .error {
+      background-color: #fce8e6;
+      color: #c5221f;
+      display: block;
+    }
+    .switch-container {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+      margin-right: 10px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #4285f4;
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+    .option-label {
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Gemini Clipboard Assistant</h2>
+    
+    <div>
+      <label for="apiKey">Gemini API Key:</label>
+      <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
+    </div>
+    
+    <button id="saveApiKey">Save API Key</button>
+    
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="minimalistMode">
+        <span class="slider"></span>
+      </label>
+      <span class="option-label">Minimalist mode (color square only)</span>
+    </div>
+    
+    <div class="shortcuts">
+      <strong>Shortcuts:</strong>
+      <ul>
+        <li><code>Ctrl+I</code> - Send clipboard to Gemini</li>
+        <li><code>Ctrl+M</code> - Paste Gemini's response</li>
+      </ul>
+    </div>
+    
+    <div id="status" class="status"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html> 
