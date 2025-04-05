@@ -7,7 +7,7 @@ A Chrome extension that sends clipboard content to Google's Gemini 2.0 Flash API
 ## Features
 
 - **Send clipboard content to Gemini**: Press `Ctrl+I` to send your clipboard content to Gemini AI
-- **Paste Gemini's response**: Press `Ctrl+M` to paste the generated response
+- **Paste Gemini's response**: Press `Ctrl+M`(chrome) / `Ctrl+Y`(edge) to paste the generated response
 - **Context menu integration**: Right-click on selected text and choose "Send to Gemini"
 - **Two notification styles**:
   - Minimalist mode: Shows only a small colored square indicator in the top-right corner
