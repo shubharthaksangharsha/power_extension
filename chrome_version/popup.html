@@ -99,6 +99,33 @@
     .option-label {
       font-size: 14px;
     }
+    .settings-info {
+      background-color: #f1f3f4;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .settings-info p {
+      margin: 5px 0;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: white;
+      margin-left: 5px;
+    }
+    .badge-blue {
+      background-color: #4285f4;
+    }
+    .badge-green {
+      background-color: #34a853;
+    }
+    .badge-orange {
+      background-color: #fbbc05;
+    }
   </style>
 </head>
 <body>
@@ -120,11 +147,19 @@
       <span class="option-label">Minimalist mode (color square only)</span>
     </div>
     
+    <div class="settings-info">
+      <h3 style="margin-top: 0;">Current Settings</h3>
+      <p><strong>Model:</strong> <span id="modelType">Gemini 2.0 Flash</span> <span class="badge badge-blue" id="modelBadge">2.0</span></p>
+      <p><strong>JSON Mode:</strong> <span id="jsonMode">Standard</span> <span class="badge badge-blue" id="jsonBadge">STD</span></p>
+    </div>
+    
     <div class="shortcuts">
       <strong>Shortcuts:</strong>
       <ul>
-        <li><code>Ctrl+I</code> - Send clipboard to Gemini</li>
-        <li><code>Ctrl+M</code> - Paste Gemini's response</li>
+        <li><code>Alt+N</code> - Send clipboard to Gemini</li>
+        <li><code>Alt+M</code> - Paste Gemini's response</li>
+        <li><code>Alt+V</code> - Switch model type</li>
+        <li><code>Alt+C</code> - Toggle JSON mode</li>
       </ul>
     </div>
     

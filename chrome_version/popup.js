@@ -1,6 +1,18 @@
 document.addEventListener('DOMContentLoaded', function() {
-  // Load saved API key and minimalist mode setting
-  chrome.storage.local.get(['geminiApiKey', 'minimalistMode'], function(result) {
+  // Define constants for model types and JSON modes
+  const MODEL_TYPES = {
+    GEMINI_2_0_FLASH: "gemini-2.0-flash",
+    GEMINI_2_5_FLASH: "gemini-2.5-flash"
+  };
+
+  const JSON_MODES = {
+    NONE: "none",
+    SINGLE: "single",
+    MULTI: "multi"
+  };
+  
+  // Load saved API key, minimalist mode, model type and JSON mode
+  chrome.storage.local.get(['geminiApiKey', 'minimalistMode', 'modelType', 'jsonMode'], function(result) {
     if (result.geminiApiKey) {
       document.getElementById('apiKey').value = result.geminiApiKey;
     }
@@ -13,6 +25,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const minimalistMode = result.minimalistMode !== false;
     console.log("Setting checkbox to:", minimalistMode);
     document.getElementById('minimalistMode').checked = minimalistMode;
+    
+    // Update model type display
+    updateModelTypeDisplay(result.modelType || MODEL_TYPES.GEMINI_2_0_FLASH);
+    
+    // Update JSON mode display
+    updateJsonModeDisplay(result.jsonMode || JSON_MODES.NONE);
   });
 
   // Save API key button
@@ -52,6 +70,56 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   });
+  
+  // Listen for storage changes to update UI
+  chrome.storage.onChanged.addListener(function(changes) {
+    if (changes.modelType) {
+      updateModelTypeDisplay(changes.modelType.newValue);
+    }
+    
+    if (changes.jsonMode) {
+      updateJsonModeDisplay(changes.jsonMode.newValue);
+    }
+  });
+  
+  // Update model type display in UI
+  function updateModelTypeDisplay(modelType) {
+    const modelTypeElement = document.getElementById('modelType');
+    const modelBadgeElement = document.getElementById('modelBadge');
+    
+    if (modelType === MODEL_TYPES.GEMINI_2_5_FLASH) {
+      modelTypeElement.textContent = 'Gemini 2.5 Flash';
+      modelBadgeElement.textContent = '2.5';
+      modelBadgeElement.className = 'badge badge-green';
+    } else {
+      modelTypeElement.textContent = 'Gemini 2.0 Flash';
+      modelBadgeElement.textContent = '2.0';
+      modelBadgeElement.className = 'badge badge-blue';
+    }
+  }
+  
+  // Update JSON mode display in UI
+  function updateJsonModeDisplay(jsonMode) {
+    const jsonModeElement = document.getElementById('jsonMode');
+    const jsonBadgeElement = document.getElementById('jsonBadge');
+    
+    switch (jsonMode) {
+      case JSON_MODES.SINGLE:
+        jsonModeElement.textContent = 'JSON Single-Select';
+        jsonBadgeElement.textContent = 'SINGLE';
+        jsonBadgeElement.className = 'badge badge-orange';
+        break;
+      case JSON_MODES.MULTI:
+        jsonModeElement.textContent = 'JSON Multi-Select';
+        jsonBadgeElement.textContent = 'MULTI';
+        jsonBadgeElement.className = 'badge badge-green';
+        break;
+      default:
+        jsonModeElement.textContent = 'Standard';
+        jsonBadgeElement.textContent = 'STD';
+        jsonBadgeElement.className = 'badge badge-blue';
+    }
+  }
 
   function showStatus(message, type) {
     const statusElement = document.getElementById('status');

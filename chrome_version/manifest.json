@@ -30,15 +30,27 @@
   "commands": {
     "send-to-gemini": {
       "suggested_key": {
-        "default": "Ctrl+I"
+        "default": "Alt+N"
       },
       "description": "Send clipboard to Gemini"
     },
     "paste-response": {
       "suggested_key": {
-        "default": "Ctrl+M"
+        "default": "Alt+M"
       },
       "description": "Paste Gemini's response"
+    },
+    "switch-model": {
+      "suggested_key": {
+        "default": "Alt+V"
+      },
+      "description": "Switch between Gemini models"
+    },
+    "toggle-json-mode": {
+      "suggested_key": {
+        "default": "Alt+C"
+      },
+      "description": "Toggle JSON response mode"
     }
   },
   "content_scripts": [

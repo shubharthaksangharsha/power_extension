@@ -189,12 +189,133 @@ function showDirectIndicator(type = 'info', duration = 2000) {
   return indicator;
 }
 
+// New function to display JSON answer indicator
+function showJsonAnswerIndicator(answers, isMulti) {
+  // Create main indicator container
+  let container = document.querySelector('.gemini-answer-container');
+  
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'gemini-answer-container';
+    
+    // Position the container
+    Object.assign(container.style, {
+      position: 'fixed',
+      top: '10px',
+      right: '10px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      zIndex: '2147483647',
+      pointerEvents: 'none', // Make it non-interactive
+      gap: '3px'
+    });
+    
+    document.body.appendChild(container);
+  }
+  
+  // Create or get text display for the answer
+  let textDisplay = container.querySelector('.gemini-answer-text');
+  if (!textDisplay) {
+    textDisplay = document.createElement('div');
+    textDisplay.className = 'gemini-answer-text';
+    
+    // Style the text
+    Object.assign(textDisplay.style, {
+      color: 'black',
+      backgroundColor: 'rgba(255, 255, 255, 0.7)',
+      padding: '1px 3px',
+      borderRadius: '2px',
+      fontSize: '10px',
+      fontWeight: 'bold',
+      fontFamily: 'Arial, sans-serif',
+      lineHeight: '1',
+      textAlign: 'center',
+      opacity: '0',
+      transition: 'opacity 0.3s ease',
+      userSelect: 'none'
+    });
+    
+    container.appendChild(textDisplay);
+  }
+  
+  // Create or get the color indicator
+  let indicator = container.querySelector('.gemini-answer-indicator');
+  
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.className = 'gemini-answer-indicator';
+    
+    // Apply styles for indicator - match exact size of minimalistic indicators
+    Object.assign(indicator.style, {
+      width: '10px',
+      height: '10px',
+      borderRadius: '2px',
+      backgroundColor: '#34a853', // green
+      opacity: '0',
+      transition: 'opacity 0.3s ease',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+    });
+    
+    container.appendChild(indicator);
+  }
+  
+  // Update the text display
+  textDisplay.textContent = answers;
+  
+  // Clear any existing timeout
+  if (container.timeoutId) {
+    clearTimeout(container.timeoutId);
+  }
+  
+  // Show both components
+  textDisplay.style.opacity = '1';
+  indicator.style.opacity = '1';
+  
+  // Set timeout to hide after 3 seconds
+  container.timeoutId = setTimeout(() => {
+    textDisplay.style.opacity = '0';
+    indicator.style.opacity = '0';
+    
+    // Remove the container after fade out
+    setTimeout(() => {
+      if (container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+    }, 300);
+    
+    container.timeoutId = null;
+  }, 3000);
+  
+  return container;
+}
+
 // Show notification based on user preference
 async function showNotification(status, type = 'info', duration = 3000) {
   try {
     // Get user preference
-    const result = await chrome.storage.local.get(['minimalistMode']);
+    const result = await chrome.storage.local.get(['minimalistMode', 'jsonMode']);
     console.log("Minimalist mode setting:", result.minimalistMode);
+    
+    // Check if this is a JSON answer notification
+    const isJsonAnswer = status && (status.startsWith("JSON Answer:") || status.startsWith("JSON Answers:"));
+    
+    // If it's a JSON answer notification, handle it specially
+    if (isJsonAnswer && type === 'success') {
+      // Extract the answer(s) from the notification text
+      let answers = '';
+      let isMulti = false;
+      
+      if (status.startsWith("JSON Answer:")) {
+        answers = status.replace("JSON Answer:", "").trim();
+      } else {
+        answers = status.replace("JSON Answers:", "").trim();
+        isMulti = true;
+      }
+      
+      // Show a special indicator for JSON answers
+      return showJsonAnswerIndicator(answers, isMulti);
+    }
     
     // Note: If minimalistMode is undefined, default to true
     // But if it's explicitly set to false, use detailed mode
@@ -404,13 +525,22 @@ function showDetailedToast(message, type = 'info', duration = 3000) {
 // Clean up any existing notification elements
 function cleanupNotifications() {
   // Find and remove any text-based notification elements
-  const notificationElements = document.querySelectorAll('.sending-notification, .gemini-toast, .toast-notification, .notification-text');
+  const notificationElements = document.querySelectorAll('.sending-notification, .gemini-toast, .toast-notification, .notification-text, .gemini-answer-indicator, .gemini-answer-container, .gemini-answer-text, .gemini-answer-tooltip');
   notificationElements.forEach(element => {
     if (element && element.parentNode) {
       element.parentNode.removeChild(element);
     }
   });
 }
+
+// Add middle mouse click event listener
+document.addEventListener('mouseup', async (e) => {
+  // Check if it's middle mouse button (button 1)
+  if (e.button === 1) {
+    // Send message to background script to paste response
+    chrome.runtime.sendMessage({action: "pasteResponseRequest"});
+  }
+});
 
 // Add listener for notification events
 document.addEventListener('DOMContentLoaded', function() {
