@@ -191,103 +191,109 @@ function showDirectIndicator(type = 'info', duration = 2000) {
 
 // New function to display JSON answer indicator
 function showJsonAnswerIndicator(answers, isMulti) {
-  // Create main indicator container
-  let container = document.querySelector('.gemini-answer-container');
-  
-  if (!container) {
-    container = document.createElement('div');
-    container.className = 'gemini-answer-container';
+  // Get saved text color
+  chrome.storage.local.get(['answerTextColor'], function(result) {
+    const textColor = result.answerTextColor || '#000000';
     
-    // Position the container
-    Object.assign(container.style, {
-      position: 'fixed',
-      top: '10px',
-      right: '10px',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      zIndex: '2147483647',
-      pointerEvents: 'none', // Make it non-interactive
-      gap: '3px'
-    });
+    // Create main indicator container
+    let container = document.querySelector('.gemini-answer-container');
     
-    document.body.appendChild(container);
-  }
-  
-  // Create or get text display for the answer
-  let textDisplay = container.querySelector('.gemini-answer-text');
-  if (!textDisplay) {
-    textDisplay = document.createElement('div');
-    textDisplay.className = 'gemini-answer-text';
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'gemini-answer-container';
+      
+      // Position the container
+      Object.assign(container.style, {
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        zIndex: '2147483647',
+        pointerEvents: 'none', // Make it non-interactive
+        gap: '3px'
+      });
+      
+      document.body.appendChild(container);
+    }
     
-    // Style the text
-    Object.assign(textDisplay.style, {
-      color: 'black',
-      backgroundColor: 'rgba(255, 255, 255, 0.7)',
-      padding: '1px 3px',
-      borderRadius: '2px',
-      fontSize: '10px',
-      fontWeight: 'bold',
-      fontFamily: 'Arial, sans-serif',
-      lineHeight: '1',
-      textAlign: 'center',
-      opacity: '0',
-      transition: 'opacity 0.3s ease',
-      userSelect: 'none'
-    });
+    // Create or get text display for the answer
+    let textDisplay = container.querySelector('.gemini-answer-text');
+    if (!textDisplay) {
+      textDisplay = document.createElement('div');
+      textDisplay.className = 'gemini-answer-text';
+      
+      // Style the text - only text color is customizable
+      Object.assign(textDisplay.style, {
+        color: textColor, // Use custom text color
+        backgroundColor: 'rgba(255, 255, 255, 0.7)', // Fixed background
+        padding: '1px 3px',
+        borderRadius: '2px',
+        fontSize: '10px',
+        fontWeight: 'bold',
+        fontFamily: 'Arial, sans-serif',
+        lineHeight: '1',
+        textAlign: 'center',
+        opacity: '0',
+        transition: 'opacity 0.3s ease',
+        userSelect: 'none'
+      });
+      
+      container.appendChild(textDisplay);
+    } else {
+      // Update text color if display already exists
+      textDisplay.style.color = textColor;
+    }
     
-    container.appendChild(textDisplay);
-  }
-  
-  // Create or get the color indicator
-  let indicator = container.querySelector('.gemini-answer-indicator');
-  
-  if (!indicator) {
-    indicator = document.createElement('div');
-    indicator.className = 'gemini-answer-indicator';
+    // Create or get the color indicator
+    let indicator = container.querySelector('.gemini-answer-indicator');
     
-    // Apply styles for indicator - match exact size of minimalistic indicators
-    Object.assign(indicator.style, {
-      width: '10px',
-      height: '10px',
-      borderRadius: '2px',
-      backgroundColor: '#34a853', // green
-      opacity: '0',
-      transition: 'opacity 0.3s ease',
-      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
-    });
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.className = 'gemini-answer-indicator';
+      
+      // Apply styles for indicator - always green, matching minimalistic indicators
+      Object.assign(indicator.style, {
+        width: '10px',
+        height: '10px',
+        borderRadius: '2px',
+        backgroundColor: '#34a853', // Always green - not affected by color picker
+        opacity: '0',
+        transition: 'opacity 0.3s ease',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+      });
+      
+      container.appendChild(indicator);
+    }
     
-    container.appendChild(indicator);
-  }
-  
-  // Update the text display
-  textDisplay.textContent = answers;
-  
-  // Clear any existing timeout
-  if (container.timeoutId) {
-    clearTimeout(container.timeoutId);
-  }
-  
-  // Show both components
-  textDisplay.style.opacity = '1';
-  indicator.style.opacity = '1';
-  
-  // Set timeout to hide after 3 seconds
-  container.timeoutId = setTimeout(() => {
-    textDisplay.style.opacity = '0';
-    indicator.style.opacity = '0';
+    // Update the text display
+    textDisplay.textContent = answers;
     
-    // Remove the container after fade out
-    setTimeout(() => {
-      if (container.parentNode) {
-        container.parentNode.removeChild(container);
-      }
-    }, 300);
+    // Clear any existing timeout
+    if (container.timeoutId) {
+      clearTimeout(container.timeoutId);
+    }
     
-    container.timeoutId = null;
-  }, 3000);
-  
-  return container;
+    // Show both components
+    textDisplay.style.opacity = '1';
+    indicator.style.opacity = '1';
+    
+    // Set timeout to hide after 3 seconds
+    container.timeoutId = setTimeout(() => {
+      textDisplay.style.opacity = '0';
+      indicator.style.opacity = '0';
+      
+      // Remove the container after fade out
+      setTimeout(() => {
+        if (container.parentNode) {
+          container.parentNode.removeChild(container);
+        }
+      }, 300);
+      
+      container.timeoutId = null;
+    }, 3000);
+  });
 }
 
 // Show notification based on user preference

@@ -11,8 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
     MULTI: "multi"
   };
   
-  // Load saved API key, minimalist mode, model type and JSON mode
-  chrome.storage.local.get(['geminiApiKey', 'minimalistMode', 'modelType', 'jsonMode'], function(result) {
+  // Load saved API key, minimalist mode, model type, JSON mode, and answer text color
+  chrome.storage.local.get(['geminiApiKey', 'minimalistMode', 'modelType', 'jsonMode', 'answerTextColor'], function(result) {
     if (result.geminiApiKey) {
       document.getElementById('apiKey').value = result.geminiApiKey;
     }
@@ -31,6 +31,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update JSON mode display
     updateJsonModeDisplay(result.jsonMode || JSON_MODES.NONE);
+    
+    // Set the color picker to saved value or default to black
+    const colorPicker = document.getElementById('answerTextColor');
+    const savedColor = result.answerTextColor || '#000000';
+    colorPicker.value = savedColor;
+    updateColorPreview(savedColor);
+    
+    // Select the preset color if it matches
+    selectMatchingPresetColor(savedColor);
   });
 
   // Save API key button
@@ -71,6 +80,27 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
+  // Handle text color changes
+  const colorPicker = document.getElementById('answerTextColor');
+  colorPicker.addEventListener('change', function() {
+    const color = this.value;
+    saveTextColor(color);
+    updateColorPreview(color);
+    selectMatchingPresetColor(color);
+  });
+  
+  // Set up preset color clicks
+  const presetColors = document.querySelectorAll('.preset-color');
+  presetColors.forEach(preset => {
+    preset.addEventListener('click', function() {
+      const color = this.getAttribute('data-color');
+      colorPicker.value = color;
+      saveTextColor(color);
+      updateColorPreview(color);
+      selectMatchingPresetColor(color);
+    });
+  });
+  
   // Listen for storage changes to update UI
   chrome.storage.onChanged.addListener(function(changes) {
     if (changes.modelType) {
@@ -80,7 +110,38 @@ document.addEventListener('DOMContentLoaded', function() {
     if (changes.jsonMode) {
       updateJsonModeDisplay(changes.jsonMode.newValue);
     }
+    
+    if (changes.answerTextColor) {
+      colorPicker.value = changes.answerTextColor.newValue;
+      updateColorPreview(changes.answerTextColor.newValue);
+      selectMatchingPresetColor(changes.answerTextColor.newValue);
+    }
   });
+  
+  // Update color preview box
+  function updateColorPreview(color) {
+    document.getElementById('colorPreview').style.backgroundColor = color;
+  }
+  
+  // Save text color to storage
+  function saveTextColor(color) {
+    chrome.storage.local.set({answerTextColor: color}, function() {
+      showStatus('Text color saved', 'success');
+    });
+  }
+  
+  // Select matching preset color if available
+  function selectMatchingPresetColor(color) {
+    const presetColors = document.querySelectorAll('.preset-color');
+    presetColors.forEach(preset => {
+      const presetColor = preset.getAttribute('data-color');
+      if (presetColor.toLowerCase() === color.toLowerCase()) {
+        preset.classList.add('selected');
+      } else {
+        preset.classList.remove('selected');
+      }
+    });
+  }
   
   // Update model type display in UI
   function updateModelTypeDisplay(modelType) {

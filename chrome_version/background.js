@@ -1,6 +1,11 @@
 // Store the latest Gemini response
 let geminiResponse = "";
 
+// Screenshot debounce control
+let isCapturingScreenshot = false;
+let screenshotDebounceTimer = null;
+const SCREENSHOT_DEBOUNCE_TIME = 1000; // 1 second between screenshot attempts
+
 // Default settings
 const MODEL_TYPES = {
   GEMINI_2_0_FLASH: "gemini-2.0-flash",
@@ -117,7 +122,8 @@ async function getClipboardAndSendToGemini() {
     
     // If in JSON mode, take a screenshot instead of using clipboard
     if (jsonMode !== JSON_MODES.NONE) {
-      await captureScreenshotAndProcess(tabs[0].id);
+      // Use debounced screenshot capture
+      debouncedCaptureScreenshot(tabs[0].id);
       return;
     }
     
@@ -148,12 +154,37 @@ async function getClipboardAndSendToGemini() {
   }
 }
 
+// Debounced screenshot capture function
+function debouncedCaptureScreenshot(tabId) {
+  // If already capturing, don't trigger another capture
+  if (isCapturingScreenshot) {
+    showNotification("Screenshot capture in progress...", "info");
+    return;
+  }
+  
+  // Clear any existing timer
+  if (screenshotDebounceTimer) {
+    clearTimeout(screenshotDebounceTimer);
+  }
+  
+  // Set flag and show processing indicator
+  isCapturingScreenshot = true;
+  showNotification("Processing request", "processing");
+  
+  // Capture screenshot after short delay to ensure UI updates
+  screenshotDebounceTimer = setTimeout(() => {
+    captureScreenshotAndProcess(tabId)
+      .finally(() => {
+        // Reset flag when done (success or failure)
+        isCapturingScreenshot = false;
+        screenshotDebounceTimer = null;
+      });
+  }, 100);
+}
+
 // Capture screenshot and process it with Gemini
 async function captureScreenshotAndProcess(tabId) {
   try {
-    // Show processing indicator first
-    showNotification("Processing request", "processing");
-    
     // Capture the screenshot of the visible area
     const screenshot = await chrome.tabs.captureVisibleTab(null, {format: 'png'});
     
