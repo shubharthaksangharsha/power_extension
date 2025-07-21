@@ -11,8 +11,34 @@ document.addEventListener('DOMContentLoaded', function() {
     MULTI: "multi"
   };
   
-  // Load saved API key, minimalist mode, model type, JSON mode, and answer text color
-  chrome.storage.local.get(['geminiApiKey', 'minimalistMode', 'modelType', 'jsonMode', 'answerTextColor'], function(result) {
+  // Clockwise position sequence
+  const CLOCKWISE_POSITIONS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+  
+  // Setup collapsible sections
+  const collapsibles = document.querySelectorAll('.collapsible');
+  collapsibles.forEach(collapsible => {
+    const header = collapsible.querySelector('.collapsible-header');
+    header.addEventListener('click', () => {
+      collapsible.classList.toggle('open');
+    });
+  });
+  
+  // Open display settings section by default
+  document.querySelector('.collapsible').classList.add('open');
+  
+  // Load saved settings from storage
+  chrome.storage.local.get([
+    'geminiApiKey', 
+    'minimalistMode', 
+    'modelType', 
+    'jsonMode', 
+    'answerTextColor',
+    'indicatorPosition',
+    'positionX',
+    'positionY',
+    'clockwiseMode',
+    'currentClockwiseIndex'
+  ], function(result) {
     if (result.geminiApiKey) {
       document.getElementById('apiKey').value = result.geminiApiKey;
     }
@@ -40,6 +66,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Select the preset color if it matches
     selectMatchingPresetColor(savedColor);
+    
+    // Set clockwise mode
+    const clockwiseMode = result.clockwiseMode || false;
+    document.getElementById('clockwiseMode').checked = clockwiseMode;
+    updateClockwiseMode(clockwiseMode, result.currentClockwiseIndex || 0);
+    
+    // If not in clockwise mode, set normal position selection
+    if (!clockwiseMode) {
+      const position = result.indicatorPosition || 'top-right';
+      selectPosition(position);
+    }
+    
+    // Set offset inputs
+    const posX = result.positionX !== undefined ? result.positionX : 10;
+    const posY = result.positionY !== undefined ? result.positionY : 10;
+    document.getElementById('positionX').value = posX;
+    document.getElementById('positionY').value = posY;
   });
 
   // Save API key button
@@ -101,6 +144,105 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
+  // Handle clockwise mode toggle
+  document.getElementById('clockwiseMode').addEventListener('change', function() {
+    const clockwiseMode = this.checked;
+    
+    console.log("Setting clockwise mode to:", clockwiseMode);
+    
+    // Set current index to 0 (top-left) when enabling
+    const currentIndex = clockwiseMode ? 0 : null;
+    
+    chrome.storage.local.set({
+      clockwiseMode: clockwiseMode,
+      currentClockwiseIndex: currentIndex
+    }, function() {
+      updateClockwiseMode(clockwiseMode, currentIndex);
+      
+      // If enabling clockwise, disable position grid selection
+      if (clockwiseMode) {
+        showStatus('Clockwise mode enabled', 'success');
+      } else {
+        // When disabling, set to a default position
+        selectPosition('top-right');
+        savePositionSettings();
+        showStatus('Clockwise mode disabled', 'success');
+      }
+      
+      // Test the notification
+      testClockwiseIndicator();
+    });
+  });
+  
+  // Update UI for clockwise mode
+  function updateClockwiseMode(enabled, currentIndex) {
+    const positionGrid = document.getElementById('positionGrid');
+    const clockwiseInfo = document.querySelector('.clockwise-info');
+    const positionOptions = document.querySelectorAll('.position-option');
+    
+    if (enabled) {
+      // Disable normal position grid
+      positionGrid.style.opacity = '0.5';
+      positionOptions.forEach(option => {
+        option.style.pointerEvents = 'none';
+        option.classList.remove('selected');
+      });
+      
+      // Show clockwise info
+      clockwiseInfo.style.display = 'block';
+      
+      // Update current dot in clockwise preview
+      updateClockwiseDot(currentIndex);
+    } else {
+      // Enable normal position grid
+      positionGrid.style.opacity = '1';
+      positionOptions.forEach(option => {
+        option.style.pointerEvents = 'auto';
+      });
+      
+      // Hide clockwise info
+      clockwiseInfo.style.display = 'none';
+    }
+  }
+  
+  // Update the clockwise preview dot to show current position
+  function updateClockwiseDot(index) {
+    const position = CLOCKWISE_POSITIONS[index];
+    const dots = document.querySelectorAll('.clockwise-dot');
+    
+    dots.forEach(dot => {
+      if (dot.getAttribute('data-position') === position) {
+        dot.classList.add('current');
+      } else {
+        dot.classList.remove('current');
+      }
+    });
+  }
+  
+  // Test the clockwise indicator
+  function testClockwiseIndicator() {
+    chrome.runtime.sendMessage({
+      action: "testClockwiseIndicator"
+    });
+  }
+  
+  // Set up position option clicks
+  const positionOptions = document.querySelectorAll('.position-option');
+  positionOptions.forEach(option => {
+    option.addEventListener('click', function() {
+      // Only process if clockwise mode is off
+      if (!document.getElementById('clockwiseMode').checked) {
+        const position = this.getAttribute('data-position');
+        selectPosition(position);
+        savePositionSettings();
+      }
+    });
+  });
+  
+  // Handle position offset changes
+  document.getElementById('positionX').addEventListener('change', savePositionSettings);
+  document.getElementById('positionY').addEventListener('change', savePositionSettings);
+  
   // Listen for storage changes to update UI
   chrome.storage.onChanged.addListener(function(changes) {
     if (changes.modelType) {
@@ -116,7 +258,82 @@ document.addEventListener('DOMContentLoaded', function() {
       updateColorPreview(changes.answerTextColor.newValue);
       selectMatchingPresetColor(changes.answerTextColor.newValue);
     }
+    
+    if (changes.indicatorPosition) {
+      selectPosition(changes.indicatorPosition.newValue);
+    }
+    
+    if (changes.positionX) {
+      document.getElementById('positionX').value = changes.positionX.newValue;
+    }
+    
+    if (changes.positionY) {
+      document.getElementById('positionY').value = changes.positionY.newValue;
+    }
+    
+    if (changes.clockwiseMode) {
+      document.getElementById('clockwiseMode').checked = changes.clockwiseMode.newValue;
+      const currentIndex = changes.currentClockwiseIndex ? 
+        changes.currentClockwiseIndex.newValue : 0;
+      updateClockwiseMode(changes.clockwiseMode.newValue, currentIndex);
+    }
+    
+    if (changes.currentClockwiseIndex) {
+      updateClockwiseDot(changes.currentClockwiseIndex.newValue);
+    }
   });
+  
+  // Select position by data-position value
+  function selectPosition(position) {
+    const positionOptions = document.querySelectorAll('.position-option');
+    positionOptions.forEach(option => {
+      if (option.getAttribute('data-position') === position) {
+        option.classList.add('selected');
+      } else {
+        option.classList.remove('selected');
+      }
+    });
+  }
+  
+  // Save position settings to storage
+  function savePositionSettings() {
+    const clockwiseMode = document.getElementById('clockwiseMode').checked;
+    
+    if (clockwiseMode) {
+      // In clockwise mode, we only save the offset values
+      const posX = parseInt(document.getElementById('positionX').value) || 10;
+      const posY = parseInt(document.getElementById('positionY').value) || 10;
+      
+      chrome.storage.local.set({
+        positionX: posX,
+        positionY: posY
+      }, function() {
+        showStatus('Position offsets saved', 'success');
+      });
+    } else {
+      // In normal mode, save position and offsets
+      const selectedPosition = document.querySelector('.position-option.selected');
+      const positionValue = selectedPosition ? selectedPosition.getAttribute('data-position') : 'top-right';
+      const posX = parseInt(document.getElementById('positionX').value) || 10;
+      const posY = parseInt(document.getElementById('positionY').value) || 10;
+      
+      chrome.storage.local.set({
+        indicatorPosition: positionValue,
+        positionX: posX,
+        positionY: posY
+      }, function() {
+        showStatus('Position settings saved', 'success');
+        
+        // Test the indicator with new position
+        chrome.runtime.sendMessage({
+          action: "testPositionChange",
+          position: positionValue,
+          positionX: posX,
+          positionY: posY
+        });
+      });
+    }
+  }
   
   // Update color preview box
   function updateColorPreview(color) {

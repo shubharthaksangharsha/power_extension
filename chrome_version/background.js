@@ -198,9 +198,9 @@ async function captureScreenshotAndProcess(tabId) {
     // Prepare prompt based on JSON mode
     let prompt = "";
     if (jsonMode === JSON_MODES.SINGLE) {
-      prompt = "Look at this screenshot containing multiple choice question or options. Select ONE best option. Answer only with the number or letter of the option (like 1, 2, 3, A, B, C). Format as {\"answer\": \"X\"} where X is just the option number or letter.";
+      prompt = "Look at this screenshot containing multiple choice question or options. Select ONE best option. Answer only with the number or letter of the option (like 1, 2, 3, A, B, C). Format as {\"answer\": \"X\"} where X is just the option number or letter. Use your own knowledge to select the best option. Do not choose wrong/already selected option.";
     } else {
-      prompt = "Look at this screenshot containing multiple choice question or options. Select ALL applicable options. Answer only with the numbers or letters of the options separated by spaces (like \"1 2 3\" or \"A B C\"). Format as {\"answers\": \"X Y Z\"} where X Y Z are just the option numbers or letters.";
+      prompt = "Look at this screenshot containing multiple choice question or options. Select ALL applicable options. Answer only with the numbers or letters of the options separated by spaces (like \"1 2 3\" or \"A B C\"). Format as {\"answers\": \"X Y Z\"} where X Y Z are just the option numbers or letters. Use your own knowledge to select the best options. Do not choose wrong/already selected options.";
     }
     
     // Process the screenshot with Gemini
@@ -238,7 +238,8 @@ async function processContentWithGemini(content, imageBase64 = null) {
       ],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 2048
+        maxOutputTokens: 8192,
+        responseMimeType: "application/json"
       }
     };
     
@@ -443,6 +444,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         showNotification("Display mode changed to detailed", "info");
       }
     });
+    return true;
+  }
+  
+  // Handle position change test
+  if (message.action === "testPositionChange") {
+    console.log("Testing notification with new position:", message.position, message.positionX, message.positionY);
+    
+    // Show a test notification
+    showNotification("Position updated", "success");
+    return true;
+  }
+  
+  // Handle clockwise mode test
+  if (message.action === "testClockwiseIndicator") {
+    console.log("Testing clockwise indicator");
+    
+    // Show a test notification
+    showNotification("Clockwise mode enabled", "success");
     return true;
   }
   

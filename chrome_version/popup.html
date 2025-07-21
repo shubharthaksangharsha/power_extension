@@ -13,7 +13,7 @@
       flex-direction: column;
       gap: 15px;
     }
-    input[type="password"], input[type="text"] {
+    input[type="password"], input[type="text"], input[type="number"], select {
       padding: 8px;
       width: 100%;
       box-sizing: border-box;
@@ -162,6 +162,125 @@
       font-size: 12px;
       color: #666;
     }
+    .section-title {
+      margin-top: 15px;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 15px;
+      color: #444;
+    }
+    .position-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      margin-top: 5px;
+    }
+    .position-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    .position-option:hover {
+      background-color: #f5f5f5;
+    }
+    .position-option.selected {
+      background-color: #e8f0fe;
+      border-color: #4285f4;
+    }
+    .position-icon {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+    }
+    .position-dot {
+      width: 6px;
+      height: 6px;
+      background-color: #4285f4;
+      border-radius: 50%;
+      margin: auto;
+    }
+    .position-label {
+      margin-top: 3px;
+      font-size: 11px;
+      text-align: center;
+    }
+    .position-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 5px;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .input-group label {
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+    .input-group input {
+      padding: 5px;
+      font-size: 12px;
+    }
+    .collapsible {
+      margin-top: 10px;
+    }
+    .collapsible-header {
+      background-color: #f1f3f4;
+      padding: 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .collapsible-content {
+      padding: 8px;
+      border: 1px solid #f1f3f4;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+      display: none;
+    }
+    .collapsible.open .collapsible-content {
+      display: block;
+    }
+    .collapsible-header::after {
+      content: "▼";
+      font-size: 10px;
+      transition: transform 0.3s;
+    }
+    .collapsible.open .collapsible-header::after {
+      transform: rotate(180deg);
+    }
+    .clockwise-info {
+      margin-top: 10px;
+      padding: 8px;
+      background-color: #f1f3f4;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #666;
+    }
+    .clockwise-preview {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    .clockwise-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #ccc;
+    }
+    .clockwise-dot.current {
+      background-color: #4285f4;
+    }
   </style>
 </head>
 <body>
@@ -183,23 +302,121 @@
       <span class="option-label">Minimalist mode (color square only)</span>
     </div>
     
-    <div class="color-option">
-      <label for="answerTextColor">Answer Text Color:</label>
-      <input type="color" id="answerTextColor" value="#000000">
-      <div class="color-preview" id="colorPreview"></div>
-    </div>
-    
-    <div class="preset-colors" id="presetColors">
-      <div class="preset-color" style="background-color: #000000;" data-color="#000000"></div>
-      <div class="preset-color" style="background-color: #FFFFFF;" data-color="#FFFFFF"></div>
-      <div class="preset-color" style="background-color: #FF0000;" data-color="#FF0000"></div>
-      <div class="preset-color" style="background-color: #00FF00;" data-color="#00FF00"></div>
-      <div class="preset-color" style="background-color: #0000FF;" data-color="#0000FF"></div>
-      <div class="preset-color" style="background-color: #FFFF00;" data-color="#FFFF00"></div>
-    </div>
-    
-    <div class="color-note">
-      <small>Note: This only changes the text color. Indicator colors (green/yellow/red) remain the same.</small>
+    <div class="collapsible">
+      <div class="collapsible-header">Display Settings</div>
+      <div class="collapsible-content">
+        <div class="color-option">
+          <label for="answerTextColor">Answer Text Color:</label>
+          <input type="color" id="answerTextColor" value="#000000">
+          <div class="color-preview" id="colorPreview"></div>
+        </div>
+        
+        <div class="preset-colors" id="presetColors">
+          <div class="preset-color" style="background-color: #000000;" data-color="#000000"></div>
+          <div class="preset-color" style="background-color: #FFFFFF;" data-color="#FFFFFF"></div>
+          <div class="preset-color" style="background-color: #FF0000;" data-color="#FF0000"></div>
+          <div class="preset-color" style="background-color: #00FF00;" data-color="#00FF00"></div>
+          <div class="preset-color" style="background-color: #0000FF;" data-color="#0000FF"></div>
+          <div class="preset-color" style="background-color: #FFFF00;" data-color="#FFFF00"></div>
+        </div>
+        
+        <div class="color-note">
+          <small>Note: This only changes the text color. Indicator colors (green/yellow/red) remain the same.</small>
+        </div>
+
+        <div class="section-title">Position</div>
+        
+        <div class="switch-container">
+          <label class="switch">
+            <input type="checkbox" id="clockwiseMode">
+            <span class="slider"></span>
+          </label>
+          <span class="option-label">Use Clockwise Rotation (corners only)</span>
+        </div>
+        
+        <div id="positionGrid" class="position-grid">
+          <div class="position-option" data-position="top-left">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 1; grid-row: 1;"></div>
+            </div>
+            <div class="position-label">Top Left</div>
+          </div>
+          <div class="position-option" data-position="top-center">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 2; grid-row: 1;"></div>
+            </div>
+            <div class="position-label">Top Center</div>
+          </div>
+          <div class="position-option selected" data-position="top-right">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 3; grid-row: 1;"></div>
+            </div>
+            <div class="position-label">Top Right</div>
+          </div>
+          <div class="position-option" data-position="middle-left">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 1; grid-row: 2;"></div>
+            </div>
+            <div class="position-label">Middle Left</div>
+          </div>
+          <div class="position-option" data-position="middle-center">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 2; grid-row: 2;"></div>
+            </div>
+            <div class="position-label">Center</div>
+          </div>
+          <div class="position-option" data-position="middle-right">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 3; grid-row: 2;"></div>
+            </div>
+            <div class="position-label">Middle Right</div>
+          </div>
+          <div class="position-option" data-position="bottom-left">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 1; grid-row: 3;"></div>
+            </div>
+            <div class="position-label">Bottom Left</div>
+          </div>
+          <div class="position-option" data-position="bottom-center">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 2; grid-row: 3;"></div>
+            </div>
+            <div class="position-label">Bottom Center</div>
+          </div>
+          <div class="position-option" data-position="bottom-right">
+            <div class="position-icon">
+              <div class="position-dot" style="grid-column: 3; grid-row: 3;"></div>
+            </div>
+            <div class="position-label">Bottom Right</div>
+          </div>
+        </div>
+
+        <div class="clockwise-info" style="margin-top: 10px; display: none;">
+          <div class="clockwise-preview">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <div class="clockwise-dot current" data-position="top-left"></div>
+              <div class="clockwise-dot" data-position="top-right"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <div class="clockwise-dot" data-position="bottom-left"></div>
+              <div class="clockwise-dot" data-position="bottom-right"></div>
+            </div>
+          </div>
+          <small>Next position highlighted. Rotates: Top Left → Top Right → Bottom Right → Bottom Left</small>
+        </div>
+
+        <div class="section-title">Offset</div>
+        <div class="position-inputs">
+          <div class="input-group">
+            <label for="positionX">X Offset (px):</label>
+            <input type="number" id="positionX" min="0" max="500" value="10">
+          </div>
+          <div class="input-group">
+            <label for="positionY">Y Offset (px):</label>
+            <input type="number" id="positionY" min="0" max="500" value="10">
+          </div>
+        </div>
+      </div>
     </div>
     
     <div class="settings-info">

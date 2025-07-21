@@ -130,7 +130,7 @@ function initializeIndicator() {
 }
 
 // Direct indicator creation function (text-free version)
-function showDirectIndicator(type = 'info', duration = 2000) {
+function showDirectIndicator(type = 'info', duration = 2000, position = 'top-right', offsetX = 10, offsetY = 10) {
   // Create or get the indicator
   let indicator = document.querySelector('.gemini-direct-indicator');
   
@@ -141,8 +141,6 @@ function showDirectIndicator(type = 'info', duration = 2000) {
     // Apply styles to make it a small square
     Object.assign(indicator.style, {
       position: 'fixed',
-      top: '10px',
-      right: '10px',
       width: '10px',
       height: '10px',
       borderRadius: '2px',
@@ -156,6 +154,9 @@ function showDirectIndicator(type = 'info', duration = 2000) {
     
     document.body.appendChild(indicator);
   }
+  
+  // Apply position
+  applyPositionToElement(indicator, position, offsetX, offsetY);
   
   // Clear any existing timeout
   if (indicator.timeoutId) {
@@ -190,7 +191,7 @@ function showDirectIndicator(type = 'info', duration = 2000) {
 }
 
 // New function to display JSON answer indicator
-function showJsonAnswerIndicator(answers, isMulti) {
+function showJsonAnswerIndicator(answers, isMulti, position = 'top-right', offsetX = 10, offsetY = 10) {
   // Get saved text color
   chrome.storage.local.get(['answerTextColor'], function(result) {
     const textColor = result.answerTextColor || '#000000';
@@ -205,8 +206,6 @@ function showJsonAnswerIndicator(answers, isMulti) {
       // Position the container
       Object.assign(container.style, {
         position: 'fixed',
-        top: '10px',
-        right: '10px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -217,6 +216,9 @@ function showJsonAnswerIndicator(answers, isMulti) {
       
       document.body.appendChild(container);
     }
+    
+    // Apply position to container
+    applyPositionToElement(container, position, offsetX, offsetY);
     
     // Create or get text display for the answer
     let textDisplay = container.querySelector('.gemini-answer-text');
@@ -277,12 +279,12 @@ function showJsonAnswerIndicator(answers, isMulti) {
     
     // Show both components
     textDisplay.style.opacity = '1';
-    indicator.style.opacity = '1';
+    // indicator.style.opacity = '1';
     
     // Set timeout to hide after 3 seconds
     container.timeoutId = setTimeout(() => {
       textDisplay.style.opacity = '0';
-      indicator.style.opacity = '0';
+      // indicator.style.opacity = '0';
       
       // Remove the container after fade out
       setTimeout(() => {
@@ -296,12 +298,87 @@ function showJsonAnswerIndicator(answers, isMulti) {
   });
 }
 
+// Cache for the current interaction position
+let currentInteractionPosition = null;
+let currentInteractionOffsetX = 10;
+let currentInteractionOffsetY = 10;
+let lastUsedClockwiseIndex = null;
+
+// Reset position cache when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+  currentInteractionPosition = null;
+  lastUsedClockwiseIndex = null;
+});
+
 // Show notification based on user preference
 async function showNotification(status, type = 'info', duration = 3000) {
   try {
     // Get user preference
-    const result = await chrome.storage.local.get(['minimalistMode', 'jsonMode']);
+    const result = await chrome.storage.local.get([
+      'minimalistMode', 
+      'jsonMode', 
+      'indicatorPosition', 
+      'positionX', 
+      'positionY', 
+      'clockwiseMode',
+      'currentClockwiseIndex'
+    ]);
     console.log("Minimalist mode setting:", result.minimalistMode);
+    
+    let position, posX, posY;
+    
+    // If this is a "processing" notification, it's the start of a new interaction
+    if (type === 'processing') {
+      // Reset position cache for a new interaction
+      currentInteractionPosition = null;
+    }
+    
+    // Check if we already have a position for this interaction
+    if (currentInteractionPosition) {
+      console.log("Using cached position for current interaction:", currentInteractionPosition);
+      position = currentInteractionPosition;
+      posX = currentInteractionOffsetX;
+      posY = currentInteractionOffsetY;
+    } else {
+      // Handle clockwise positioning if enabled
+      if (result.clockwiseMode) {
+        // Define the clockwise positions (corners only)
+        const CLOCKWISE_POSITIONS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+        
+        // Get current index (default to 0 if not set)
+        let currentIndex = result.currentClockwiseIndex !== undefined ? result.currentClockwiseIndex : 0;
+        lastUsedClockwiseIndex = currentIndex;
+        
+        // Use the current position
+        position = CLOCKWISE_POSITIONS[currentIndex];
+        
+        // Calculate next index for next time (only update when we start a new interaction)
+        if (type === 'processing') {
+          const nextIndex = (currentIndex + 1) % CLOCKWISE_POSITIONS.length;
+          
+          // Save the new index for next time
+          await chrome.storage.local.set({currentClockwiseIndex: nextIndex});
+          
+          console.log(`Clockwise mode: using position ${position} (index ${currentIndex}), next will be ${CLOCKWISE_POSITIONS[nextIndex]}`);
+        }
+        
+        // Use saved offsets
+        posX = result.positionX !== undefined ? result.positionX : 10;
+        posY = result.positionY !== undefined ? result.positionY : 10;
+      } else {
+        // Use fixed position as set in options
+        position = result.indicatorPosition || 'top-right';
+        posX = result.positionX !== undefined ? result.positionX : 10;
+        posY = result.positionY !== undefined ? result.positionY : 10;
+      }
+      
+      // Cache the position for this interaction
+      currentInteractionPosition = position;
+      currentInteractionOffsetX = posX;
+      currentInteractionOffsetY = posY;
+      
+      console.log("Setting new position for interaction:", position);
+    }
     
     // Check if this is a JSON answer notification
     const isJsonAnswer = status && (status.startsWith("JSON Answer:") || status.startsWith("JSON Answers:"));
@@ -320,7 +397,7 @@ async function showNotification(status, type = 'info', duration = 3000) {
       }
       
       // Show a special indicator for JSON answers
-      return showJsonAnswerIndicator(answers, isMulti);
+      return showJsonAnswerIndicator(answers, isMulti, position, posX, posY);
     }
     
     // Note: If minimalistMode is undefined, default to true
@@ -354,26 +431,26 @@ async function showNotification(status, type = 'info', duration = 3000) {
     // Use the appropriate notification style based on user preference
     if (minimalistMode) {
       // If minimalist mode is on, always use color square
-      return showDirectIndicator(type, 2000);
+      return showDirectIndicator(type, 2000, position, posX, posY);
     } else {
       // In detail mode, use appropriate method based on environment
       if (isJupyter) {
         // In Jupyter, use a special detailed notification that works in that environment
-        return showJupyterDetailedToast(message, type, duration);
+        return showJupyterDetailedToast(message, type, duration, position, posX, posY);
       } else {
         // In regular environments, use standard detailed toast
-        return showDetailedToast(message, type, duration);
+        return showDetailedToast(message, type, duration, position, posX, posY);
       }
     }
   } catch (err) {
     console.error("Error determining notification style:", err);
     // Fallback to minimalist as default in case of error
-    return showDirectIndicator(type, 2000);
+    return showDirectIndicator(type, 2000, 'top-right', 10, 10);
   }
 }
 
 // Create a Jupyter-specific detailed toast notification
-function showJupyterDetailedToast(message, type = 'info', duration = 3000) {
+function showJupyterDetailedToast(message, type = 'info', duration = 3000, position = 'top-right', offsetX = 10, offsetY = 10) {
   // Create a floating notification that works in Jupyter's CSP environment
   const toast = document.createElement('div');
   
@@ -399,8 +476,6 @@ function showJupyterDetailedToast(message, type = 'info', duration = 3000) {
   // Apply styles (avoid using innerHTML for better CSP compatibility)
   Object.assign(toast.style, {
     position: 'fixed',
-    bottom: '20px',
-    right: '20px',
     backgroundColor: 'white',
     color: '#333',
     padding: '12px 16px',
@@ -415,6 +490,9 @@ function showJupyterDetailedToast(message, type = 'info', duration = 3000) {
     transition: 'opacity 0.3s ease, transform 0.3s ease',
     borderLeft: `4px solid ${bgColor}`
   });
+  
+  // Apply position
+  applyPositionToElement(toast, position, offsetX, offsetY);
   
   // Create title element
   const titleEl = document.createElement('div');
@@ -455,7 +533,7 @@ function showJupyterDetailedToast(message, type = 'info', duration = 3000) {
 }
 
 // Create a detailed toast notification for regular environments
-function showDetailedToast(message, type = 'info', duration = 3000) {
+function showDetailedToast(message, type = 'info', duration = 3000, position = 'top-right', offsetX = 10, offsetY = 10) {
   // Create a floating notification
   const toast = document.createElement('div');
   
@@ -481,8 +559,6 @@ function showDetailedToast(message, type = 'info', duration = 3000) {
   // Apply styles
   Object.assign(toast.style, {
     position: 'fixed',
-    bottom: '20px',
-    right: '20px',
     backgroundColor: 'white',
     color: '#333',
     padding: '12px 16px',
@@ -497,6 +573,9 @@ function showDetailedToast(message, type = 'info', duration = 3000) {
     transition: 'opacity 0.3s ease, transform 0.3s ease',
     borderLeft: `4px solid ${bgColor}`
   });
+  
+  // Apply position
+  applyPositionToElement(toast, position, offsetX, offsetY);
   
   // Set content
   toast.innerHTML = `
@@ -526,6 +605,74 @@ function showDetailedToast(message, type = 'info', duration = 3000) {
   }, duration);
   
   return toast;
+}
+
+// Apply position settings to an element
+function applyPositionToElement(element, position, offsetX, offsetY) {
+  // Reset any previously set position properties
+  element.style.top = 'auto';
+  element.style.right = 'auto';
+  element.style.bottom = 'auto';
+  element.style.left = 'auto';
+  element.style.transform = 'none';
+  
+  // Apply position based on the position value
+  switch (position) {
+    case 'top-left':
+      element.style.top = `${offsetY}px`;
+      element.style.left = `${offsetX}px`;
+      break;
+      
+    case 'top-center':
+      element.style.top = `${offsetY}px`;
+      element.style.left = '50%';
+      element.style.transform = 'translateX(-50%)';
+      break;
+      
+    case 'top-right':
+      element.style.top = `${offsetY}px`;
+      element.style.right = `${offsetX}px`;
+      break;
+      
+    case 'middle-left':
+      element.style.top = '50%';
+      element.style.left = `${offsetX}px`;
+      element.style.transform = 'translateY(-50%)';
+      break;
+      
+    case 'middle-center':
+      element.style.top = '50%';
+      element.style.left = '50%';
+      element.style.transform = 'translate(-50%, -50%)';
+      break;
+      
+    case 'middle-right':
+      element.style.top = '50%';
+      element.style.right = `${offsetX}px`;
+      element.style.transform = 'translateY(-50%)';
+      break;
+      
+    case 'bottom-left':
+      element.style.bottom = `${offsetY}px`;
+      element.style.left = `${offsetX}px`;
+      break;
+      
+    case 'bottom-center':
+      element.style.bottom = `${offsetY}px`;
+      element.style.left = '50%';
+      element.style.transform = 'translateX(-50%)';
+      break;
+      
+    case 'bottom-right':
+      element.style.bottom = `${offsetY}px`;
+      element.style.right = `${offsetX}px`;
+      break;
+      
+    default:
+      // Default to top-right
+      element.style.top = `${offsetY}px`;
+      element.style.right = `${offsetX}px`;
+  }
 }
 
 // Clean up any existing notification elements
