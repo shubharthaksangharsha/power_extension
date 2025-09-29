@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Define constants for model types and JSON modes
   const MODEL_TYPES = {
     GEMINI_2_0_FLASH: "gemini-2.0-flash",
-    GEMINI_2_5_FLASH: "gemini-2.5-flash"
+    GEMINI_2_5_FLASH: "gemini-2.5-flash",
+    GEMINI_2_5_PRO: "gemini-2.5-pro"
   };
 
   const JSON_MODES = {
@@ -365,7 +366,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const modelTypeElement = document.getElementById('modelType');
     const modelBadgeElement = document.getElementById('modelBadge');
     
-    if (modelType === MODEL_TYPES.GEMINI_2_5_FLASH) {
+    if (modelType === MODEL_TYPES.GEMINI_2_5_PRO) {
+      modelTypeElement.textContent = 'Gemini 2.5 Pro';
+      modelBadgeElement.textContent = 'PRO';
+      modelBadgeElement.className = 'badge badge-purple';
+    } else if (modelType === MODEL_TYPES.GEMINI_2_5_FLASH) {
       modelTypeElement.textContent = 'Gemini 2.5 Flash';
       modelBadgeElement.textContent = '2.5';
       modelBadgeElement.className = 'badge badge-green';

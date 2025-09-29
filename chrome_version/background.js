@@ -9,7 +9,8 @@ const SCREENSHOT_DEBOUNCE_TIME = 1000; // 1 second between screenshot attempts
 // Default settings
 const MODEL_TYPES = {
   GEMINI_2_0_FLASH: "gemini-2.0-flash",
-  GEMINI_2_5_FLASH: "gemini-2.5-flash"
+  GEMINI_2_5_FLASH: "gemini-2.5-flash",
+  GEMINI_2_5_PRO: "gemini-2.5-pro"
 };
 
 const JSON_MODES = {
@@ -56,18 +57,30 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-// Toggle between model types
+// Toggle between model types (cycle through all three)
 async function toggleModelType() {
   try {
     const settings = await chrome.storage.local.get(['modelType']);
     const currentModel = settings.modelType || MODEL_TYPES.GEMINI_2_0_FLASH;
     
-    const newModel = currentModel === MODEL_TYPES.GEMINI_2_0_FLASH ? 
-      MODEL_TYPES.GEMINI_2_5_FLASH : MODEL_TYPES.GEMINI_2_0_FLASH;
+    let newModel, modelName;
+    
+    switch (currentModel) {
+      case MODEL_TYPES.GEMINI_2_0_FLASH:
+        newModel = MODEL_TYPES.GEMINI_2_5_FLASH;
+        modelName = "Gemini 2.5 Flash";
+        break;
+      case MODEL_TYPES.GEMINI_2_5_FLASH:
+        newModel = MODEL_TYPES.GEMINI_2_5_PRO;
+        modelName = "Gemini 2.5 Pro";
+        break;
+      default:
+        newModel = MODEL_TYPES.GEMINI_2_0_FLASH;
+        modelName = "Gemini 2.0 Flash";
+        break;
+    }
     
     await chrome.storage.local.set({ modelType: newModel });
-    
-    const modelName = newModel === MODEL_TYPES.GEMINI_2_0_FLASH ? "Gemini 2.0 Flash" : "Gemini 2.5 Flash";
     showNotification(`Switched to ${modelName}`, "success");
   } catch (error) {
     console.error("Error toggling model type:", error);
@@ -258,8 +271,8 @@ async function processContentWithGemini(content, imageBase64 = null) {
       });
     }
     
-    // Add thinking configuration for Gemini 2.5
-    if (modelType === MODEL_TYPES.GEMINI_2_5_FLASH) {
+    // Add thinking configuration for Gemini 2.5 models
+    if (modelType === MODEL_TYPES.GEMINI_2_5_FLASH || modelType === MODEL_TYPES.GEMINI_2_5_PRO) {
       requestBody.generationConfig.thinkingConfig = {
         thinkingBudget: -1  // Dynamic thinking
       };
