@@ -345,16 +345,16 @@ async function processContentWithGemini(content, imageBase64 = null) {
           } else {
             // Fallback to raw response if JSON structure is unexpected
             geminiResponse = rawResponse;
-            showNotification("Response ready (Ctrl+Y to paste)", "success");
+            showNotification("Response ready (Ctrl+Q to paste)", "success");
           }
         } catch (jsonError) {
           console.error("Error parsing JSON response:", jsonError);
           geminiResponse = rawResponse; // Fallback to raw response
-          showNotification("Response ready (Ctrl+Y to paste)", "success");
+          showNotification("Response ready (Ctrl+Q to paste)", "success");
         }
       } else {
         geminiResponse = rawResponse;
-        showNotification("Response ready (Ctrl+Y to paste)", "success");
+        showNotification("Response ready (Ctrl+Q to paste)", "success");
       }
       
       // Store the response in extension storage for persistence

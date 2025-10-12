@@ -12,7 +12,7 @@ A Chrome/Edge extension that sends clipboard content or screenshots to Google's 
   - Multi-select mode: Returns multiple correct answers
 - **Screenshot analysis**: Automatically captures and analyzes your screen in JSON modes
 - **Send clipboard content to Gemini**: Press `Ctrl+I` to send your clipboard content to Gemini AI
-- **Paste Gemini's response**: Press `Ctrl+Y` to paste the generated response
+- **Paste Gemini's response**: Press `Ctrl+Q` to paste the generated response
 - **Model switching**: Press `Alt+V` to toggle between Gemini model versions
 - **JSON mode toggle**: Press `Alt+B` to cycle between standard, single-select and multi-select modes
 - **Context menu integration**: Right-click on selected text and choose "Send to Gemini"
@@ -51,7 +51,7 @@ A Chrome/Edge extension that sends clipboard content or screenshots to Google's 
 4. Click "Load unpacked" and select the `edge_version` folder
 5. The extension is now installed and ready to use
 
-> **Note**: The Edge version uses different keyboard shortcuts (`Ctrl+I`/`Ctrl+Y`) compared to the Chrome version (`Alt+N`/`Alt+M`).
+> **Note**: The Edge version uses different keyboard shortcuts (`Ctrl+I`/`Ctrl+Q`) compared to the Chrome version (`Alt+N`/`Alt+M`).
 
 ## Setup
 
@@ -72,7 +72,7 @@ A Chrome/Edge extension that sends clipboard content or screenshots to Google's 
 2. Press `Ctrl+I` (Edge) or `Alt+N` (Chrome) to send the clipboard content to Gemini
 3. Wait for visual confirmation (color indicator or notification)
 4. Navigate to where you want to paste the response
-5. Press `Ctrl+Y` (Edge) or `Alt+M` (Chrome) to paste Gemini's response
+5. Press `Ctrl+Q` (Edge) or `Alt+M` (Chrome) to paste Gemini's response
 
 ### JSON Mode for Multiple Choice
 1. Press `Alt+B` (Edge) or `Alt+C` (Chrome) to toggle to Single or Multi-select JSON mode
@@ -88,7 +88,7 @@ A Chrome/Edge extension that sends clipboard content or screenshots to Google's 
 1. Select text on any webpage
 2. Right-click and select "Send to Gemini"
 3. Wait for the response
-4. Press `Ctrl+Y` (Edge) or `Alt+M` (Chrome) to paste the response
+4. Press `Ctrl+Q` (Edge) or `Alt+M` (Chrome) to paste the response
 
 ## Notification Styles
 
@@ -143,7 +143,7 @@ Adjust the X and Y offset values to fine-tune the exact position.
 
 ### Edge Version (`edge_version/` folder):
 - Same file structure as Chrome version
-- Uses different keyboard shortcuts (`Ctrl+I`/`Ctrl+Y` instead of `Alt+N`/`Alt+M`)
+- Uses different keyboard shortcuts (`Ctrl+I`/`Ctrl+Q` instead of `Alt+N`/`Alt+M`)
 - JSON mode toggle uses `Alt+B` instead of `Alt+C`
 
 ## Privacy
