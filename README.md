@@ -1,20 +1,20 @@
 # Gemini Clipboard Assistant
 
-A Chrome extension that sends clipboard content or screenshots to Google's Gemini API and allows you to paste or display responses with keyboard shortcuts.
+A Chrome/Edge extension that sends clipboard content or screenshots to Google's Gemini API and allows you to paste or display responses with keyboard shortcuts.
 
 ![Gemini Clipboard Assistant](window-screen.png)
 
 ## Features
 
-- **Multiple Gemini models**: Switch between Gemini 2.0 Flash and Gemini 2.5 Flash with dynamic thinking
+- **Multiple Gemini models**: Switch between Gemini 2.0 Flash, 2.5 Flash, and 2.5 Pro with dynamic thinking
 - **JSON response modes**: Get structured answers for multiple-choice questions
   - Single-select mode: Returns one best answer
   - Multi-select mode: Returns multiple correct answers
 - **Screenshot analysis**: Automatically captures and analyzes your screen in JSON modes
-- **Send clipboard content to Gemini**: Press `Alt+N` to send your clipboard content to Gemini AI
-- **Paste Gemini's response**: Press `Alt+M` to paste the generated response
+- **Send clipboard content to Gemini**: Press `Ctrl+I` to send your clipboard content to Gemini AI
+- **Paste Gemini's response**: Press `Ctrl+Y` to paste the generated response
 - **Model switching**: Press `Alt+V` to toggle between Gemini model versions
-- **JSON mode toggle**: Press `Alt+C` to cycle between standard, single-select and multi-select modes
+- **JSON mode toggle**: Press `Alt+B` to cycle between standard, single-select and multi-select modes
 - **Context menu integration**: Right-click on selected text and choose "Send to Gemini"
 - **Customizable display**:
   - Choose text color with color picker or presets
@@ -36,13 +36,22 @@ A Chrome extension that sends clipboard content or screenshots to Google's Gemin
 *(Coming soon)*
 
 ### Manual Installation
+
+#### For Chrome:
 1. Download or clone this repository
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" in the top-right corner
-4. Click "Load unpacked" and select the folder containing the extension files
+4. Click "Load unpacked" and select the `chrome_version` folder
 5. The extension is now installed and ready to use
 
-> **Note**: Microsoft Edge support will be added soon.
+#### For Microsoft Edge:
+1. Download or clone this repository
+2. Open Edge and navigate to `edge://extensions/`
+3. Enable "Developer mode" in the left sidebar
+4. Click "Load unpacked" and select the `edge_version` folder
+5. The extension is now installed and ready to use
+
+> **Note**: The Edge version uses different keyboard shortcuts (`Ctrl+I`/`Ctrl+Y`) compared to the Chrome version (`Alt+N`/`Alt+M`).
 
 ## Setup
 
@@ -60,26 +69,26 @@ A Chrome extension that sends clipboard content or screenshots to Google's Gemin
 
 ### Basic Usage
 1. Copy text to your clipboard (`Ctrl+C`)
-2. Press `Alt+N` to send the clipboard content to Gemini
+2. Press `Ctrl+I` (Edge) or `Alt+N` (Chrome) to send the clipboard content to Gemini
 3. Wait for visual confirmation (color indicator or notification)
 4. Navigate to where you want to paste the response
-5. Press `Alt+M` to paste Gemini's response
+5. Press `Ctrl+Y` (Edge) or `Alt+M` (Chrome) to paste Gemini's response
 
 ### JSON Mode for Multiple Choice
-1. Press `Alt+C` to toggle to Single or Multi-select JSON mode
-2. Press `Alt+N` to take a screenshot of your multiple-choice question
+1. Press `Alt+B` (Edge) or `Alt+C` (Chrome) to toggle to Single or Multi-select JSON mode
+2. Press `Ctrl+I` (Edge) or `Alt+N` (Chrome) to take a screenshot of your multiple-choice question
 3. The extension automatically analyzes the image and displays the answer(s)
 4. Answer appears in your selected position on screen
 
 ### Model Switching
-1. Press `Alt+V` to toggle between Gemini 2.0 Flash and Gemini 2.5 Flash models
+1. Press `Alt+V` to toggle between Gemini 2.0 Flash, 2.5 Flash, and 2.5 Pro models
 2. A notification confirms your selection
 
 ### Context Menu
 1. Select text on any webpage
 2. Right-click and select "Send to Gemini"
 3. Wait for the response
-4. Press `Alt+M` to paste the response
+4. Press `Ctrl+Y` (Edge) or `Alt+M` (Chrome) to paste the response
 
 ## Notification Styles
 
@@ -115,19 +124,27 @@ Adjust the X and Y offset values to fine-tune the exact position.
 ## Technical Details
 
 - Built with Chrome's Manifest V3
-- Uses the Gemini 2.0 Flash and 2.5 Flash API
-- Securely stores your API key in Chrome's local storage
+- Uses the Gemini 2.0 Flash, 2.5 Flash, and 2.5 Pro API
+- Securely stores your API key in browser's local storage
 - Compatible with Content Security Policy (CSP) restrictions
 - Works in standard websites and restrictive environments like Jupyter notebooks
+- Supports both Chrome and Microsoft Edge browsers
 
 ## Files
 
+### Chrome Version (`chrome_version/` folder):
 - `manifest.json`: Extension configuration
 - `popup.html` & `popup.js`: User interface for settings and API key management
 - `background.js`: Background service worker for API communication
 - `content.js`: Content script for clipboard operations and visual feedback
 - `toast.js`: Visual notification system
+- `direct-injector.js`: Direct injection for CSP-restricted environments
 - `myicon.png`: Extension icon
+
+### Edge Version (`edge_version/` folder):
+- Same file structure as Chrome version
+- Uses different keyboard shortcuts (`Ctrl+I`/`Ctrl+Y` instead of `Alt+N`/`Alt+M`)
+- JSON mode toggle uses `Alt+B` instead of `Alt+C`
 
 ## Privacy
 
