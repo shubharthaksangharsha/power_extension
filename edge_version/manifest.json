@@ -39,6 +39,18 @@
         "default": "Ctrl+Y"
       },
       "description": "Paste Gemini's response"
+    },
+    "switch-model": {
+      "suggested_key": {
+        "default": "Alt+V"
+      },
+      "description": "Switch between Gemini models"
+    },
+    "toggle-json-mode": {
+      "suggested_key": {
+        "default": "Alt+B"
+      },
+      "description": "Toggle JSON response mode"
     }
   },
   "content_scripts": [
