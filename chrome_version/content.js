@@ -304,14 +304,73 @@ let currentInteractionOffsetX = 10;
 let currentInteractionOffsetY = 10;
 let lastUsedClockwiseIndex = null;
 
+// Remember the most recently focused editable element. This is used by the
+// "Paste" button on the in-page expander: clicking the button itself moves
+// `document.activeElement` to the button, so the paste handler would
+// otherwise have no idea where the user actually wanted the text.
+let lastEditableElement = null;
+function isEditableElement(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'TEXTAREA' || tag === 'INPUT' || el.isContentEditable === true;
+}
+document.addEventListener('focusin', (e) => {
+  if (isEditableElement(e.target)) {
+    lastEditableElement = e.target;
+  }
+}, true);
+
 // Reset position cache when the page loads
 document.addEventListener('DOMContentLoaded', function() {
   currentInteractionPosition = null;
   lastUsedClockwiseIndex = null;
 });
 
+// Best-effort copy of an error message to the user's clipboard. Used for
+// every red/error notification so users can paste the actual error message
+// somewhere (a bug report, a search engine, etc.) instead of just seeing
+// a red square. Failures are swallowed: the user is already getting a
+// red indicator either way.
+async function copyErrorToClipboard(status) {
+  if (!status) return;
+  const text = `[Gemini Extension Error] ${status}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch (clipErr) {
+    // Fall through to the execCommand fallback for pages where the async
+    // Clipboard API is blocked (e.g. some intranets / Jupyter / iframes).
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    Object.assign(ta.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '2em',
+      height: '2em',
+      opacity: '0',
+      pointerEvents: 'none'
+    });
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  } catch (fallbackErr) {
+    console.warn('Could not copy error to clipboard:', fallbackErr);
+  }
+}
+
 // Show notification based on user preference
 async function showNotification(status, type = 'info', duration = 3000) {
+  // For any red/error toast, also copy the error text so the user can
+  // paste it elsewhere. Fire-and-forget; do not block the toast on it.
+  if (type === 'error') {
+    copyErrorToClipboard(status);
+  }
+
   try {
     // Get user preference
     const result = await chrome.storage.local.get([
@@ -695,6 +754,151 @@ document.addEventListener('mouseup', async (e) => {
   }
 });
 
+// ===========================================================================
+// Quick-action expander overlay (Alt+G)
+// ---------------------------------------------------------------------------
+// Tiny floating panel of square buttons (Send / Paste) that mirrors the
+// keyboard shortcuts. Useful when the keyboard shortcut is ergonomically
+// inconvenient (e.g. you're already mousing around in a long form).
+// Toggled via Alt+G; pressing the same shortcut again closes it.
+// ===========================================================================
+
+const EXPANDER_CLASS = 'gemini-expander-panel';
+
+function buildExpanderButton(label, title, bgColor, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.title = title;
+  btn.textContent = label;
+  Object.assign(btn.style, {
+    width: '34px',
+    height: '34px',
+    border: 'none',
+    borderRadius: '4px',
+    backgroundColor: bgColor,
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    fontFamily: 'Arial, sans-serif',
+    letterSpacing: '0.5px',
+    cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
+    transition: 'transform 0.1s ease, filter 0.1s ease',
+    padding: '0',
+    lineHeight: '1'
+  });
+  btn.addEventListener('mouseenter', () => { btn.style.filter = 'brightness(1.1)'; });
+  btn.addEventListener('mouseleave', () => { btn.style.filter = 'none'; });
+  // CRITICAL: preventDefault on mousedown so the button never grabs focus.
+  // Otherwise document.activeElement becomes the button and the paste flow
+  // loses the user's text-field target. We still apply the press animation.
+  btn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    btn.style.transform = 'scale(0.95)';
+  });
+  btn.addEventListener('mouseup',   () => { btn.style.transform = 'scale(1.0)'; });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+  return btn;
+}
+
+function closeExpander() {
+  const existing = document.querySelector('.' + EXPANDER_CLASS);
+  if (existing && existing.parentNode) {
+    existing.parentNode.removeChild(existing);
+  }
+}
+
+function toggleExpander() {
+  if (document.querySelector('.' + EXPANDER_CLASS)) {
+    closeExpander();
+    return;
+  }
+
+  const panel = document.createElement('div');
+  panel.className = EXPANDER_CLASS;
+  Object.assign(panel.style, {
+    position: 'fixed',
+    bottom: '24px',
+    right: '24px',
+    display: 'flex',
+    gap: '6px',
+    padding: '6px',
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    border: '1px solid #d0d7de',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.18)',
+    zIndex: '2147483647',
+    pointerEvents: 'auto',
+    fontFamily: 'Arial, sans-serif'
+  });
+
+  // Send: hide the panel first (so it doesn't appear in JSON-mode
+  // screenshots), then either (a) for standard mode, read the clipboard
+  // RIGHT HERE, while the click's transient user activation is still
+  // valid, and ship the text directly to the background; or (b) for JSON
+  // mode, ask the background to take a screenshot. Reading the clipboard
+  // up front avoids a stale-clipboard race where the round-trip through
+  // the background outlives the click's user activation and the content
+  // script's clipboard read silently returns old/empty data.
+  const sendBtn = buildExpanderButton('S', 'Send clipboard to Gemini', '#4285f4', async () => {
+    closeExpander();
+
+    let jsonMode = 'none';
+    try {
+      const settings = await chrome.storage.local.get(['jsonMode']);
+      jsonMode = settings.jsonMode || 'none';
+    } catch (_) { /* default to standard mode */ }
+
+    if (jsonMode !== 'none') {
+      chrome.runtime.sendMessage({ action: 'triggerScreenshotSend' });
+      return;
+    }
+
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) {
+        // Empty clipboard — let background show the standard error toast.
+        chrome.runtime.sendMessage({ action: 'triggerSendToGemini' });
+        return;
+      }
+      showNotification('Sending to Gemini', 'processing');
+      chrome.runtime.sendMessage({ action: 'processClipboardText', text });
+    } catch (err) {
+      console.warn('[Gemini] direct clipboard read failed, using background fallback:', err);
+      chrome.runtime.sendMessage({ action: 'triggerSendToGemini' });
+    }
+  });
+
+  // Paste: leave the panel open so the user can paste multiple times.
+  const pasteBtn = buildExpanderButton('P', 'Paste latest Gemini response', '#34a853', () => {
+    chrome.runtime.sendMessage({ action: 'pasteResponseRequest' });
+  });
+
+  panel.appendChild(sendBtn);
+  panel.appendChild(pasteBtn);
+
+  if (document.body) {
+    document.body.appendChild(panel);
+  } else {
+    // body may not exist yet on some early-loading pages
+    document.documentElement.appendChild(panel);
+  }
+}
+
+// Capture-phase keydown so the shortcut works even when an input/textarea
+// has focus, and so we can preventDefault before the page sees the 'g' key.
+document.addEventListener('keydown', (e) => {
+  if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey &&
+      (e.key === 'g' || e.key === 'G' || e.code === 'KeyG')) {
+    e.preventDefault();
+    toggleExpander();
+  }
+}, true);
+
 // Add listener for notification events
 document.addEventListener('DOMContentLoaded', function() {
   initializeIndicator();
@@ -761,47 +965,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Handle paste request
   if (message.action === "pasteResponse" && message.response) {
-    // Get the active element
-    const activeElement = document.activeElement;
-    
-    // Check if the active element is an input or textarea
-    if (activeElement.tagName === 'TEXTAREA' || 
-        activeElement.tagName === 'INPUT' || 
-        activeElement.isContentEditable) {
-      
-      // Handle input and textarea elements
-      if (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT') {
-        // Get the current selection positions
-        const startPos = activeElement.selectionStart;
-        const endPos = activeElement.selectionEnd;
-        
-        // Get the current value
-        const currentValue = activeElement.value;
-        
-        // Create the new value with the response inserted
-        const newValue = currentValue.substring(0, startPos) + 
-                        message.response + 
+    // Pick a target. Prefer the currently-focused editable element. If the
+    // active element is something else (e.g. the user just clicked our
+    // expander panel's "P" button), fall back to the most recently focused
+    // editable element so the paste still goes where the user expects.
+    let target = document.activeElement;
+    if (!isEditableElement(target) &&
+        isEditableElement(lastEditableElement) &&
+        document.contains(lastEditableElement)) {
+      target = lastEditableElement;
+      try { target.focus(); } catch (_) { /* ignore */ }
+    }
+
+    if (isEditableElement(target)) {
+      if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT') {
+        const startPos = target.selectionStart != null ? target.selectionStart : target.value.length;
+        const endPos   = target.selectionEnd   != null ? target.selectionEnd   : startPos;
+        const currentValue = target.value;
+        const newValue = currentValue.substring(0, startPos) +
+                        message.response +
                         currentValue.substring(endPos);
-        
-        // Set the new value
-        activeElement.value = newValue;
-        
-        // Move the cursor to the end of the inserted text
-        activeElement.selectionStart = startPos + message.response.length;
-        activeElement.selectionEnd = startPos + message.response.length;
-        
+        target.value = newValue;
+        target.selectionStart = startPos + message.response.length;
+        target.selectionEnd   = startPos + message.response.length;
+        // Notify frameworks (React/Vue) so controlled inputs pick up the change.
+        try {
+          target.dispatchEvent(new Event('input',  { bubbles: true }));
+          target.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (_) { /* ignore */ }
         showNotification("Response pasted", "success");
-      } 
-      // Handle contentEditable elements
-      else if (activeElement.isContentEditable) {
-        // Execute command to paste text
+      } else if (target.isContentEditable) {
         document.execCommand('insertText', false, message.response);
         showNotification("Response pasted", "success");
       }
-      
       sendResponse({success: true});
     } else {
-      // If we're not in an editable field, try to use clipboard API
+      // No editable target available — fall back to writing to the clipboard
+      // so the user can manually paste with Ctrl+V somewhere else.
       navigator.clipboard.writeText(message.response)
         .then(() => {
           showNotification("Copied to clipboard", "success");
@@ -813,7 +1013,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({success: false, error: err.message});
         });
     }
-    
+
     return true; // Required for async sendResponse
   }
 }); 

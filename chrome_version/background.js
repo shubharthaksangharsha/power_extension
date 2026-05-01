@@ -7,10 +7,13 @@ let screenshotDebounceTimer = null;
 const SCREENSHOT_DEBOUNCE_TIME = 1000; // 1 second between screenshot attempts
 
 // Default settings
+// Gemini 3.x model IDs per https://ai.google.dev/gemini-api/docs/models
+// Note: there is currently no plain "gemini-3.1-flash" text model; the latest
+// Flash text model in the 3-series is `gemini-3-flash-preview`.
 const MODEL_TYPES = {
-  GEMINI_2_0_FLASH: "gemini-2.0-flash",
-  GEMINI_2_5_FLASH: "gemini-2.5-flash",
-  GEMINI_2_5_PRO: "gemini-2.5-pro"
+  GEMINI_3_FLASH_LITE: "gemini-3.1-flash-lite-preview",
+  GEMINI_3_FLASH: "gemini-3-flash-preview",
+  GEMINI_3_PRO: "gemini-3.1-pro-preview"
 };
 
 const JSON_MODES = {
@@ -19,17 +22,21 @@ const JSON_MODES = {
   MULTI: "multi"
 };
 
+// Migrate any previously-stored legacy model IDs (e.g. gemini-2.x) to the
+// new 3.x defaults so existing users don't end up calling a removed model.
+async function migrateModelType() {
+  const stored = await chrome.storage.local.get(['modelType']);
+  const valid = Object.values(MODEL_TYPES);
+  if (!stored.modelType || !valid.includes(stored.modelType)) {
+    await chrome.storage.local.set({ modelType: MODEL_TYPES.GEMINI_3_FLASH_LITE });
+  }
+}
+
 // Initialize settings on first load
 chrome.runtime.onInstalled.addListener(async () => {
-  // Set default model and JSON mode
-  const settings = await chrome.storage.local.get(['modelType', 'jsonMode']);
-  
-  if (!settings.modelType) {
-    await chrome.storage.local.set({
-      modelType: MODEL_TYPES.GEMINI_2_0_FLASH
-    });
-  }
-  
+  await migrateModelType();
+
+  const settings = await chrome.storage.local.get(['jsonMode']);
   if (!settings.jsonMode) {
     await chrome.storage.local.set({
       jsonMode: JSON_MODES.NONE
@@ -42,6 +49,12 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: "Send to Gemini",
     contexts: ["selection"]
   });
+});
+
+// Also run migration on browser startup in case the extension was updated
+// while the browser was closed.
+chrome.runtime.onStartup.addListener(() => {
+  migrateModelType().catch(err => console.error("Model migration failed:", err));
 });
 
 // Listen for keyboard shortcuts
@@ -57,26 +70,26 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-// Toggle between model types (cycle through all three)
+// Toggle between model types (cycle Flash-Lite -> Flash -> Pro -> Flash-Lite)
 async function toggleModelType() {
   try {
     const settings = await chrome.storage.local.get(['modelType']);
-    const currentModel = settings.modelType || MODEL_TYPES.GEMINI_2_0_FLASH;
+    const currentModel = settings.modelType || MODEL_TYPES.GEMINI_3_FLASH_LITE;
     
     let newModel, modelName;
     
     switch (currentModel) {
-      case MODEL_TYPES.GEMINI_2_0_FLASH:
-        newModel = MODEL_TYPES.GEMINI_2_5_FLASH;
-        modelName = "Gemini 2.5 Flash";
+      case MODEL_TYPES.GEMINI_3_FLASH_LITE:
+        newModel = MODEL_TYPES.GEMINI_3_FLASH;
+        modelName = "Gemini 3 Flash";
         break;
-      case MODEL_TYPES.GEMINI_2_5_FLASH:
-        newModel = MODEL_TYPES.GEMINI_2_5_PRO;
-        modelName = "Gemini 2.5 Pro";
+      case MODEL_TYPES.GEMINI_3_FLASH:
+        newModel = MODEL_TYPES.GEMINI_3_PRO;
+        modelName = "Gemini 3.1 Pro";
         break;
       default:
-        newModel = MODEL_TYPES.GEMINI_2_0_FLASH;
-        modelName = "Gemini 2.0 Flash";
+        newModel = MODEL_TYPES.GEMINI_3_FLASH_LITE;
+        modelName = "Gemini 3.1 Flash-Lite";
         break;
     }
     
@@ -231,7 +244,12 @@ async function processContentWithGemini(content, imageBase64 = null) {
     // Get settings from storage
     const result = await chrome.storage.local.get(['geminiApiKey', 'modelType', 'jsonMode']);
     const apiKey = result.geminiApiKey;
-    const modelType = result.modelType || MODEL_TYPES.GEMINI_2_0_FLASH;
+    let modelType = result.modelType || MODEL_TYPES.GEMINI_3_FLASH_LITE;
+    if (!Object.values(MODEL_TYPES).includes(modelType)) {
+      // Defensive: catch any leftover legacy ID still floating around
+      modelType = MODEL_TYPES.GEMINI_3_FLASH_LITE;
+      await chrome.storage.local.set({ modelType });
+    }
     const jsonMode = result.jsonMode || JSON_MODES.NONE;
     
     if (!apiKey) {
@@ -271,11 +289,16 @@ async function processContentWithGemini(content, imageBase64 = null) {
       });
     }
     
-    // Add thinking configuration for Gemini 2.5 models
-    if (modelType === MODEL_TYPES.GEMINI_2_5_FLASH || modelType === MODEL_TYPES.GEMINI_2_5_PRO) {
-      requestBody.generationConfig.thinkingConfig = {
-        thinkingBudget: -1  // Dynamic thinking
-      };
+    // Gemini 3.x uses `thinkingLevel` ("minimal" | "low" | "medium" | "high")
+    // instead of the legacy `thinkingBudget`. Mixing them returns HTTP 400.
+    // Choose a sensible default per model so latency stays reasonable while
+    // still giving Pro room to reason on harder prompts.
+    if (modelType === MODEL_TYPES.GEMINI_3_PRO) {
+      requestBody.generationConfig.thinkingConfig = { thinkingLevel: "low" };
+    } else if (modelType === MODEL_TYPES.GEMINI_3_FLASH) {
+      requestBody.generationConfig.thinkingConfig = { thinkingLevel: "low" };
+    } else if (modelType === MODEL_TYPES.GEMINI_3_FLASH_LITE) {
+      requestBody.generationConfig.thinkingConfig = { thinkingLevel: "minimal" };
     }
     
     // Add response schema for JSON modes
@@ -328,37 +351,37 @@ async function processContentWithGemini(content, imageBase64 = null) {
       
       const rawResponse = data.candidates[0].content.parts[0].text;
       
-      // Process JSON response if in JSON mode
+      // Process JSON response if in JSON mode. We figure out the final value
+      // and the toast text first, then PERSIST to storage BEFORE showing the
+      // success notification. Otherwise an immediate Alt+M after seeing
+      // green can race the storage write and the user pastes the previous
+      // response (since the MV3 service worker may be torn down between the
+      // toast and the storage flush).
+      let toastMessage = "Response ready (Alt+M to paste)";
       if (jsonMode !== JSON_MODES.NONE) {
         try {
           const jsonResponse = JSON.parse(rawResponse);
-          
-          // Extract answer(s) from JSON
           if (jsonMode === JSON_MODES.SINGLE && jsonResponse.answer) {
             geminiResponse = jsonResponse.answer;
-            // Show special JSON answer notification
-            showNotification(`JSON Answer: ${geminiResponse}`, "success");
+            toastMessage = `JSON Answer: ${geminiResponse}`;
           } else if (jsonMode === JSON_MODES.MULTI && jsonResponse.answers) {
             geminiResponse = jsonResponse.answers;
-            // Show special JSON answers notification
-            showNotification(`JSON Answers: ${geminiResponse}`, "success");
+            toastMessage = `JSON Answers: ${geminiResponse}`;
           } else {
-            // Fallback to raw response if JSON structure is unexpected
             geminiResponse = rawResponse;
-            showNotification("Response ready (Alt+M to paste)", "success");
           }
         } catch (jsonError) {
           console.error("Error parsing JSON response:", jsonError);
-          geminiResponse = rawResponse; // Fallback to raw response
-          showNotification("Response ready (Alt+M to paste)", "success");
+          geminiResponse = rawResponse;
         }
       } else {
         geminiResponse = rawResponse;
-        showNotification("Response ready (Alt+M to paste)", "success");
       }
-      
-      // Store the response in extension storage for persistence
-      await chrome.storage.local.set({latestGeminiResponse: geminiResponse});
+
+      // Persist BEFORE notifying the user so an instant Alt+M sees the new
+      // response in storage even if the service worker is recycled.
+      await chrome.storage.local.set({ latestGeminiResponse: geminiResponse });
+      showNotification(toastMessage, "success");
     } else {
       showNotification("Empty response from Gemini", "error");
     }
@@ -386,19 +409,19 @@ function formatPromptForJsonMode(content, jsonMode) {
 // Function to paste Gemini response
 async function pasteGeminiResponse() {
   try {
-    // Try to get response from memory first
-    let response = geminiResponse;
-    
-    // If not in memory, try to get from storage
-    if (!response) {
-      const result = await chrome.storage.local.get(['latestGeminiResponse']);
-      response = result.latestGeminiResponse;
-    }
-    
+    // Storage is the source of truth. Reading from storage first guards
+    // against MV3 service-worker restarts that wipe the in-memory cache,
+    // and against very fast Alt+M presses that arrive before a freshly
+    // mutated `geminiResponse` is even readable to a new SW instance.
+    const result = await chrome.storage.local.get(['latestGeminiResponse']);
+    const response = result.latestGeminiResponse || geminiResponse;
+
     if (!response) {
       showNotification("No response available", "error");
       return;
     }
+    // Keep the in-memory cache hot for subsequent paste calls.
+    geminiResponse = response;
     
     // Send message to content script to handle pasting
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -483,6 +506,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     pasteGeminiResponse();
     return true;
   }
-  
+
+  // Triggered from the in-page expander overlay's "Send" button when its
+  // local clipboard read failed. Routes through the same flow as the
+  // Alt+N / Ctrl+I keyboard shortcut.
+  if (message.action === "triggerSendToGemini") {
+    getClipboardAndSendToGemini();
+    return false;
+  }
+
+  // Preferred path from the expander's "Send" button in standard mode:
+  // the content script already grabbed the clipboard text inside the
+  // click handler (where user activation is fresh) and is shipping it
+  // straight here, avoiding any round-trip race with the clipboard.
+  if (message.action === "processClipboardText") {
+    if (message.text && message.text.length > 0) {
+      processContentWithGemini(message.text);
+    } else {
+      showNotification("Empty clipboard", "error");
+    }
+    return false;
+  }
+
+  // Expander's "Send" button in JSON (screenshot) mode.
+  if (message.action === "triggerScreenshotSend") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs && tabs[0]) {
+        debouncedCaptureScreenshot(tabs[0].id);
+      } else {
+        showNotification("No active tab found", "error");
+      }
+    });
+    return false;
+  }
+
   return false;
 }); 

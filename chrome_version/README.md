@@ -6,7 +6,7 @@ A Chrome extension that sends clipboard content or screenshots to Google's Gemin
 
 ## Features
 
-- **Multiple Gemini models**: Switch between Gemini 2.0 Flash, Gemini 2.5 Flash, and Gemini 2.5 Pro with dynamic thinking
+- **Multiple Gemini models**: Switch between Gemini 3.1 Flash-Lite, Gemini 3 Flash, and Gemini 3.1 Pro (Gemini 3 series with `thinkingLevel` control)
 - **JSON response modes**: Get structured answers for multiple-choice questions
   - Single-select mode: Returns one best answer
   - Multi-select mode: Returns multiple correct answers
@@ -15,6 +15,8 @@ A Chrome extension that sends clipboard content or screenshots to Google's Gemin
 - **Paste Gemini's response**: Press `Alt+M` to paste the generated response
 - **Model switching**: Press `Alt+V` to toggle between Gemini model versions
 - **JSON mode toggle**: Press `Alt+C` to cycle between standard, single-select and multi-select modes
+- **Quick-action panel**: Press `Alt+G` to toggle a small floating panel with `S`end / `P`aste square buttons; press `Alt+G` again to hide it
+- **Auto-copy errors**: Any red/error notification is also copied to your clipboard so you can paste the actual error message into a search engine, bug report, etc.
 - **Context menu integration**: Right-click on selected text and choose "Send to Gemini"
 - **Customizable display**:
   - Choose text color with color picker or presets
@@ -72,7 +74,7 @@ A Chrome extension that sends clipboard content or screenshots to Google's Gemin
 4. Answer appears in your selected position on screen
 
 ### Model Switching
-1. Press `Alt+V` to toggle between Gemini models (2.0 Flash → 2.5 Flash → 2.5 Pro)
+1. Press `Alt+V` to toggle between Gemini models (3.1 Flash-Lite → 3 Flash → 3.1 Pro)
 2. A notification confirms your selection
 3. Different badge colors in the popup indicate the current model
 
@@ -116,7 +118,8 @@ Adjust the X and Y offset values to fine-tune the exact position.
 ## Technical Details
 
 - Built with Chrome's Manifest V3
-- Uses the Gemini 2.0 Flash, 2.5 Flash, and 2.5 Pro APIs
+- Uses the Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite-preview`), Gemini 3 Flash (`gemini-3-flash-preview`), and Gemini 3.1 Pro (`gemini-3.1-pro-preview`) APIs
+- Note: there is currently no plain text-generation `gemini-3.1-flash` model — the closest 3-series Flash is `gemini-3-flash-preview`
 - Securely stores your API key in Chrome's local storage
 - Compatible with Content Security Policy (CSP) restrictions
 - Works in standard websites and restrictive environments like Jupyter notebooks

@@ -1,9 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
-  // Define constants for model types and JSON modes
+  // Define constants for model types and JSON modes.
+  // Gemini 3.x model IDs per https://ai.google.dev/gemini-api/docs/models
   const MODEL_TYPES = {
-    GEMINI_2_0_FLASH: "gemini-2.0-flash",
-    GEMINI_2_5_FLASH: "gemini-2.5-flash",
-    GEMINI_2_5_PRO: "gemini-2.5-pro"
+    GEMINI_3_FLASH_LITE: "gemini-3.1-flash-lite-preview",
+    GEMINI_3_FLASH: "gemini-3-flash-preview",
+    GEMINI_3_PRO: "gemini-3.1-pro-preview"
   };
 
   const JSON_MODES = {
@@ -54,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('minimalistMode').checked = minimalistMode;
     
     // Update model type display
-    updateModelTypeDisplay(result.modelType || MODEL_TYPES.GEMINI_2_0_FLASH);
+    updateModelTypeDisplay(result.modelType || MODEL_TYPES.GEMINI_3_FLASH_LITE);
     
     // Update JSON mode display
     updateJsonModeDisplay(result.jsonMode || JSON_MODES.NONE);
@@ -366,17 +367,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const modelTypeElement = document.getElementById('modelType');
     const modelBadgeElement = document.getElementById('modelBadge');
     
-    if (modelType === MODEL_TYPES.GEMINI_2_5_PRO) {
-      modelTypeElement.textContent = 'Gemini 2.5 Pro';
+    if (modelType === MODEL_TYPES.GEMINI_3_PRO) {
+      modelTypeElement.textContent = 'Gemini 3.1 Pro';
       modelBadgeElement.textContent = 'PRO';
       modelBadgeElement.className = 'badge badge-purple';
-    } else if (modelType === MODEL_TYPES.GEMINI_2_5_FLASH) {
-      modelTypeElement.textContent = 'Gemini 2.5 Flash';
-      modelBadgeElement.textContent = '2.5';
+    } else if (modelType === MODEL_TYPES.GEMINI_3_FLASH) {
+      modelTypeElement.textContent = 'Gemini 3 Flash';
+      modelBadgeElement.textContent = 'FLASH';
       modelBadgeElement.className = 'badge badge-green';
     } else {
-      modelTypeElement.textContent = 'Gemini 2.0 Flash';
-      modelBadgeElement.textContent = '2.0';
+      modelTypeElement.textContent = 'Gemini 3.1 Flash-Lite';
+      modelBadgeElement.textContent = 'LITE';
       modelBadgeElement.className = 'badge badge-blue';
     }
   }
