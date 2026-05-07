@@ -326,21 +326,30 @@ document.addEventListener('DOMContentLoaded', function() {
   lastUsedClockwiseIndex = null;
 });
 
+function readLocalSelectionOrInputSlice() {
+  try {
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT') &&
+        typeof ae.value === 'string') {
+      const start = ae.selectionStart ?? 0;
+      const end = ae.selectionEnd ?? 0;
+      if (start !== end) {
+        return ae.value.substring(start, end).trim();
+      }
+    }
+    const sel = window.getSelection && window.getSelection().toString();
+    return (sel && sel.trim()) ? sel.trim() : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 // Best-effort copy of an error message to the user's clipboard. Used for
 // every red/error notification so users can paste the actual error message
 // somewhere (a bug report, a search engine, etc.) instead of just seeing
 // a red square. Failures are swallowed: the user is already getting a
 // red indicator either way.
-async function copyErrorToClipboard(status) {
-  if (!status) return;
-  const text = `[Gemini Extension Error] ${status}`;
-  try {
-    await navigator.clipboard.writeText(text);
-    return;
-  } catch (clipErr) {
-    // Fall through to the execCommand fallback for pages where the async
-    // Clipboard API is blocked (e.g. some intranets / Jupyter / iframes).
-  }
+function copyViaExecCommand(text) {
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -356,10 +365,26 @@ async function copyErrorToClipboard(status) {
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
-    document.execCommand('copy');
+    const ok = document.execCommand('copy');
     document.body.removeChild(ta);
-  } catch (fallbackErr) {
-    console.warn('Could not copy error to clipboard:', fallbackErr);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+async function copyErrorToClipboard(status) {
+  if (!status) return;
+  const text = `[Gemini Extension Error] ${status}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch (clipErr) {
+    // Fall through to the execCommand fallback for pages where the async
+    // Clipboard API is blocked (e.g. some intranets / Jupyter / iframes).
+  }
+  if (!copyViaExecCommand(text)) {
+    console.warn('Could not copy error to clipboard');
   }
 }
 
@@ -844,7 +869,7 @@ function toggleExpander() {
   // up front avoids a stale-clipboard race where the round-trip through
   // the background outlives the click's user activation and the content
   // script's clipboard read silently returns old/empty data.
-  const sendBtn = buildExpanderButton('S', 'Send clipboard to Gemini', '#4285f4', async () => {
+  const sendBtn = buildExpanderButton('S', 'Send: clipboard text, or screenshot when quiz (JSON) mode is on', '#4285f4', async () => {
     closeExpander();
 
     let jsonMode = 'none';
@@ -927,6 +952,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Handle request to get clipboard content
   if (message.action === "getClipboardContent") {
+    const localPick = readLocalSelectionOrInputSlice();
+    if (localPick) {
+      showNotification("Sending to Gemini", "processing");
+      sendResponse({ success: true, content: localPick });
+      return true;
+    }
+
     navigator.clipboard.readText()
       .then(text => {
         showNotification("Sending to Gemini", "processing");
@@ -1000,18 +1032,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       sendResponse({success: true});
     } else {
-      // No editable target available — fall back to writing to the clipboard
-      // so the user can manually paste with Ctrl+V somewhere else.
-      navigator.clipboard.writeText(message.response)
-        .then(() => {
-          showNotification("Copied to clipboard", "success");
-          sendResponse({success: true});
-        })
-        .catch(err => {
-          console.error("Could not copy text: ", err);
+      // No editable target: page clipboard API usually requires a user gesture,
+      // but the extension service worker can write with clipboardWrite.
+      const textToCopy = String(message.response);
+      chrome.runtime.sendMessage(
+        { action: "copyToClipboard", text: textToCopy },
+        (bgRes) => {
+          if (!chrome.runtime.lastError && bgRes && bgRes.success) {
+            showNotification("Copied to clipboard", "success");
+            sendResponse({ success: true });
+            return;
+          }
+          if (chrome.runtime.lastError) {
+            console.error(
+              "Could not copy text:",
+              chrome.runtime.lastError.message
+            );
+          }
+          if (copyViaExecCommand(textToCopy)) {
+            showNotification("Copied to clipboard", "success");
+            sendResponse({ success: true });
+            return;
+          }
+          const detail =
+            bgRes && bgRes.error
+              ? bgRes.error
+              : chrome.runtime.lastError?.message || "clipboard blocked";
+          console.error("Could not copy text:", detail);
           showNotification("Failed to copy response", "error");
-          sendResponse({success: false, error: err.message});
-        });
+          sendResponse({ success: false, error: detail });
+        }
+      );
     }
 
     return true; // Required for async sendResponse

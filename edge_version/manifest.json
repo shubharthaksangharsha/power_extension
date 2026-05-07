@@ -32,7 +32,7 @@
       "suggested_key": {
         "default": "Ctrl+I"
       },
-      "description": "Send clipboard to Gemini"
+      "description": "Send copied text (clipboard) to Gemini"
     },
     "paste-response": {
       "suggested_key": {

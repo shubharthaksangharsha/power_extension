@@ -428,16 +428,25 @@
       <p><strong>JSON Mode:</strong> <span id="jsonMode">Standard</span> <span class="badge badge-blue" id="jsonBadge">STD</span></p>
     </div>
     
+    <div class="settings-info" style="margin-top:10px;">
+      <h3 style="margin-top:0;">Two ways to send</h3>
+      <p style="margin:6px 0;font-size:13px;line-height:1.4;">
+        <strong>Copied text</strong> — copy with Ctrl+C, then <code>Ctrl+I</code> (standard or JSON mode formatting still applies to the answer).
+      </p>
+      <p style="margin:6px 0;font-size:13px;line-height:1.4;">
+        <strong>Screenshot quiz</strong> — press <code>Alt+B</code> until JSON single/multi mode is on, then <code>Alt+G</code> and click <strong>S</strong> to capture the visible tab. Use <code>Ctrl+Q</code> to paste the reply.
+      </p>
+    </div>
+    
     <div class="shortcuts">
       <strong>Shortcuts:</strong>
       <ul>
-        <li><code>Ctrl+I</code> - Send clipboard to Gemini</li>
-        <li><code>Ctrl+Q</code> - Paste Gemini's response</li>
-        <li><code>Alt+V</code> - Switch model type</li>
-        <li><code>Alt+B</code> - Toggle JSON mode</li>
-        <li><code>Alt+G</code> - Toggle quick-action panel (Send / Paste)</li>
+        <li><code>Ctrl+I</code> — Send clipboard text to Gemini</li>
+        <li><code>Ctrl+Q</code> — Paste Gemini response</li>
+        <li><code>Alt+V</code> — Switch model</li>
+        <li><code>Alt+B</code> — Cycle JSON / quiz mode</li>
+        <li><code>Alt+G</code> — Quick panel: <strong>S</strong> send (screenshot in quiz mode, clipboard in STD), <strong>P</strong> paste</li>
       </ul>
-      <small style="color:#666;">Errors are also auto-copied to your clipboard so you can paste them.</small>
     </div>
     
     <div id="status" class="status"></div>

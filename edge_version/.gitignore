@@ -1,0 +1,2 @@
+# Holds your Gemini key locally — never commit this file (GitHub scans will flag keys).
+config.local.js
