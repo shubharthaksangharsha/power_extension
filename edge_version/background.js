@@ -171,10 +171,33 @@ async function toggleJsonMode() {
 
 async function tryReadClipboardInExtensionContext() {
   try {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.clipboard ||
+      typeof navigator.clipboard.readText !== "function"
+    ) {
+      return "";
+    }
     const t = await navigator.clipboard.readText();
     return typeof t === "string" ? t : "";
   } catch (err) {
     return "";
+  }
+}
+
+async function swClipboardWriteMaybe(text) {
+  try {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.clipboard ||
+      typeof navigator.clipboard.writeText !== "function"
+    ) {
+      return false;
+    }
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 
@@ -590,19 +613,17 @@ async function pasteGeminiResponse() {
         { action: "pasteResponse", response: response },
         async function (r) {
           if (chrome.runtime.lastError) {
-            try {
-              await navigator.clipboard.writeText(response);
+            if (await swClipboardWriteMaybe(response)) {
               showNotification("Copied — press Ctrl+V in the editor", "success");
-            } catch (_) {
+            } else {
               showNotification("Could not paste or copy reply", "error");
             }
             return;
           }
           if (!r || !r.success) {
-            try {
-              await navigator.clipboard.writeText(response);
+            if (await swClipboardWriteMaybe(response)) {
               showNotification("Copied — press Ctrl+V in the editor", "success");
-            } catch (_) {
+            } else {
               showNotification("Could not paste or copy reply", "error");
             }
           }
@@ -714,14 +735,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // navigator.clipboard.writeText without a user gesture (page security model);
   // the service worker can with the clipboardWrite permission.
   if (message.action === "copyToClipboard" && typeof message.text === "string") {
+    const text = message.text;
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.clipboard ||
+      typeof navigator.clipboard.writeText !== "function"
+    ) {
+      sendResponse({
+        success: false,
+        error: "Clipboard API unavailable in service worker — use refresh (F5) after reload.",
+      });
+      return false;
+    }
     navigator.clipboard
-      .writeText(message.text)
+      .writeText(text)
       .then(() => sendResponse({ success: true }))
       .catch((err) => {
         console.error("Extension clipboard write failed:", err?.name, err?.message);
         sendResponse({
           success: false,
-          error: err?.message || String(err)
+          error: err?.message || String(err),
         });
       });
     return true;

@@ -1,5 +1,69 @@
 // Initialize toast notification system
+function geminiExtensionCtxLive() {
+  try {
+    return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id;
+  } catch (_) {
+    return false;
+  }
+}
+
+let geminiStaleBannerShowing = false;
+function showGeminiStaleBannerOnce() {
+  if (geminiStaleBannerShowing || !document.body) {
+    return;
+  }
+  geminiStaleBannerShowing = true;
+  const hint = document.createElement('div');
+  hint.setAttribute('data-gemini-stale', '1');
+  hint.textContent =
+    'Gemini extension was reloaded — refresh this tab (F5), then continue.';
+  Object.assign(hint.style, {
+    position: 'fixed',
+    bottom: '16px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: '#1f2937',
+    color: '#fff',
+    padding: '10px 16px',
+    borderRadius: '8px',
+    zIndex: '2147483647',
+    fontFamily: 'system-ui, Segoe UI, Arial, sans-serif',
+    fontSize: '13px',
+    boxShadow: '0 4px 14px rgba(0,0,0,.35)',
+    maxWidth: 'min(520px, 94vw)',
+    textAlign: 'center',
+    lineHeight: '1.35'
+  });
+  document.body.appendChild(hint);
+  setTimeout(() => {
+    hint.remove();
+    geminiStaleBannerShowing = false;
+  }, 14000);
+}
+
+/** Avoid uncaught rejects when chrome.runtime was torn down after extension reload. */
+function geminiRuntimeSend(payload) {
+  try {
+    if (!geminiExtensionCtxLive()) {
+      showGeminiStaleBannerOnce();
+      showDirectIndicator('error', 3500, 'bottom-right', 28, 28);
+      return false;
+    }
+    chrome.runtime.sendMessage(payload, () => {
+      void chrome.runtime.lastError;
+    });
+    return true;
+  } catch (_) {
+    showGeminiStaleBannerOnce();
+    showDirectIndicator('error', 3500, 'bottom-right', 28, 28);
+    return false;
+  }
+}
+
 function initializeToastSystem() {
+  if (!geminiExtensionCtxLive()) {
+    return;
+  }
   // Inject the toast script as a file (more CSP-friendly)
   if (!document.getElementById('gemini-toast-script')) {
     const script = document.createElement('script');
@@ -121,6 +185,9 @@ function initializeIndicator() {
   }
   
   // For regular environments, inject the script file
+  if (!geminiExtensionCtxLive()) {
+    return;
+  }
   if (!document.getElementById('gemini-indicator-script')) {
     const script = document.createElement('script');
     script.id = 'gemini-indicator-script';
@@ -192,6 +259,11 @@ function showDirectIndicator(type = 'info', duration = 2000, position = 'top-rig
 
 // New function to display JSON answer indicator
 function showJsonAnswerIndicator(answers, isMulti, position = 'top-right', offsetX = 10, offsetY = 10) {
+  if (!geminiExtensionCtxLive()) {
+    showGeminiStaleBannerOnce();
+    showDirectIndicator('success', 2500, position, offsetX, offsetY);
+    return;
+  }
   // Get saved text color
   chrome.storage.local.get(['answerTextColor'], function(result) {
     const textColor = result.answerTextColor || '#000000';
@@ -390,10 +462,14 @@ async function copyErrorToClipboard(status) {
 
 // Show notification based on user preference
 async function showNotification(status, type = 'info', duration = 3000) {
-  // For any red/error toast, also copy the error text so the user can
-  // paste it elsewhere. Fire-and-forget; do not block the toast on it.
   if (type === 'error') {
     copyErrorToClipboard(status);
+  }
+
+  if (!geminiExtensionCtxLive()) {
+    showGeminiStaleBannerOnce();
+    showDirectIndicator(type, Math.min(duration, 5000), 'bottom-right', 28, 28);
+    return;
   }
 
   try {
@@ -775,7 +851,7 @@ document.addEventListener('mouseup', async (e) => {
   // Check if it's middle mouse button (button 1)
   if (e.button === 1) {
     // Send message to background script to paste response
-    chrome.runtime.sendMessage({action: "pasteResponseRequest"});
+    geminiRuntimeSend({ action: "pasteResponseRequest" });
   }
 });
 
@@ -872,6 +948,12 @@ function toggleExpander() {
   const sendBtn = buildExpanderButton('S', 'Send: clipboard text, or screenshot when quiz (JSON) mode is on', '#4285f4', async () => {
     closeExpander();
 
+    if (!geminiExtensionCtxLive()) {
+      showGeminiStaleBannerOnce();
+      showDirectIndicator('error', 3500, 'bottom-right', 28, 28);
+      return;
+    }
+
     let jsonMode = 'none';
     try {
       const settings = await chrome.storage.local.get(['jsonMode']);
@@ -879,28 +961,32 @@ function toggleExpander() {
     } catch (_) { /* default to standard mode */ }
 
     if (jsonMode !== 'none') {
-      chrome.runtime.sendMessage({ action: 'triggerScreenshotSend' });
+      geminiRuntimeSend({ action: 'triggerScreenshotSend' });
       return;
     }
 
     try {
       const text = await navigator.clipboard.readText();
       if (!text) {
-        // Empty clipboard — let background show the standard error toast.
-        chrome.runtime.sendMessage({ action: 'triggerSendToGemini' });
+        geminiRuntimeSend({ action: 'triggerSendToGemini' });
         return;
       }
       showNotification('Sending to Gemini', 'processing');
-      chrome.runtime.sendMessage({ action: 'processClipboardText', text });
+      geminiRuntimeSend({ action: 'processClipboardText', text });
     } catch (err) {
       console.warn('[Gemini] direct clipboard read failed, using background fallback:', err);
-      chrome.runtime.sendMessage({ action: 'triggerSendToGemini' });
+      geminiRuntimeSend({ action: 'triggerSendToGemini' });
     }
   });
 
   // Paste: leave the panel open so the user can paste multiple times.
   const pasteBtn = buildExpanderButton('P', 'Paste latest Gemini response', '#34a853', () => {
-    chrome.runtime.sendMessage({ action: 'pasteResponseRequest' });
+    if (!geminiExtensionCtxLive()) {
+      showGeminiStaleBannerOnce();
+      showDirectIndicator('error', 3500, 'bottom-right', 28, 28);
+      return;
+    }
+    geminiRuntimeSend({ action: 'pasteResponseRequest' });
   });
 
   panel.appendChild(sendBtn);
@@ -1032,9 +1118,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       sendResponse({success: true});
     } else {
-      // No editable target: page clipboard API usually requires a user gesture,
-      // but the extension service worker can write with clipboardWrite.
       const textToCopy = String(message.response);
+      if (!geminiExtensionCtxLive()) {
+        const ok = copyViaExecCommand(textToCopy);
+        showDirectIndicator(ok ? 'success' : 'error', 3500, 'bottom-right', 28, 28);
+        showGeminiStaleBannerOnce();
+        sendResponse({ success: ok, error: ok ? undefined : 'Extension reloaded — refresh page' });
+        return;
+      }
       chrome.runtime.sendMessage(
         { action: "copyToClipboard", text: textToCopy },
         (bgRes) => {
